@@ -1,0 +1,894 @@
+﻿"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { Search, Copy, Check, Info, FilePlus, Loader2, ChevronRight, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// Definimos la estructura base de los datos de un Lead
+type LeadData = {
+  nombre: string;
+  apellido: string;
+  id_usuario: string;
+  provincia: string;
+  partido: string;
+  telefono: string;
+  email: string;
+  cuit: string; // normalizado sin guiones para interno, pero la UI lo muestra
+  razon_social: string;
+  acEmail: string;
+  fuente: string;
+  lead_id?: string;
+  tarea_id?: string;
+  fecha?: string;
+  ofrecio?: string;
+  oferto?: string;
+  comentario?: string;
+  source?: string;
+  [key: string]: any;
+};
+
+export default function CrearLeadPage() {
+  const [acEmail, setAcEmail] = useState("");
+  const [acCodigo, setAcCodigo] = useState("");
+  const [acSearchQuery, setAcSearchQuery] = useState("");
+  const [acsOptions, setAcsOptions] = useState<{email: string, nombre: string, codigo: string}[]>([]);
+  const [isAcDropdownOpen, setIsAcDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [fuentesOptions, setFuentesOptions] = useState<string[]>([]);
+  const [isFuenteDropdownOpen, setIsFuenteDropdownOpen] = useState(false);
+  const fuenteDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [searchMode, setSearchMode] = useState<"cuit" | "razon_social" | "nombre_apellido">("cuit");
+  const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    fetch("/api/acs")
+      .then(res => res.json())
+      .then(d => setAcsOptions(d.acs || []))
+      .catch(e => console.error("Error cargando analistas", e));
+
+    fetch("/api/fuentes")
+      .then(res => res.json())
+      .then(d => setFuentesOptions(d.fuentes || []))
+      .catch(e => console.error("Error cargando fuentes", e));
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsAcDropdownOpen(false);
+      }
+      if (fuenteDropdownRef.current && !fuenteDropdownRef.current.contains(e.target as Node)) {
+        setIsFuenteDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  
+  const [status, setStatus] = useState<"idle" | "searching" | "done">("idle");
+  const [source, setSource] = useState<"crm" | "metabase" | "base_clave" | "not_found" | null>(null);
+  
+  const [data, setData] = useState<LeadData | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+  
+  const [copiedLead, setCopiedLead] = useState(false);
+  const [isCopyingLead, setIsCopyingLead] = useState(false);
+
+  const [copiedTarea, setCopiedTarea] = useState(false);
+  const [isCopyingTarea, setIsCopyingTarea] = useState(false);
+
+  // Selector múltiple
+  const [searchResultsOptions, setSearchResultsOptions] = useState<any[]>([]);
+  const [showModal, setShowModal] = useState(false);
+
+  // Expresiones regulares
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(acEmail);
+  const queryNorm = query.replace(/\D/g, "");
+  const isValidCuit = searchMode === "cuit" ? queryNorm.length === 11 : true;
+  const isValidRs = searchMode === "razon_social" ? query.trim().length >= 3 : true;
+  const isValidNombreApellido = searchMode === "nombre_apellido" ? query.trim().length >= 3 : true;
+  const isSearchValid = isValidEmail && isValidCuit && isValidRs && isValidNombreApellido && query.trim() !== "";
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isSearchValid) return;
+
+    setErrorMsg("");
+    setSource(null);
+    setData(null);
+    setCopiedLead(false);
+    setCopiedTarea(false);
+    
+    try {
+      setStatus("searching");
+      
+      // Función helper para preview
+      const getPreview = async (email: string) => {
+        try {
+          const prefix = acCodigo || email.substring(0, 2).toUpperCase();
+          const resLead = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`).catch(() => null);
+          
+          let maxLead = 0;
+          if (resLead && resLead.ok) maxLead = (await resLead.json()).maxNumber;
+          
+          const date = new Date();
+          const dd = String(date.getDate()).padStart(2, '0');
+          const mm = String(date.getMonth() + 1).padStart(2, '0');
+          const yyyy = date.getFullYear();
+          const fecha = `${mm}/${dd}/${yyyy}`;
+          
+          const lead_id = `${prefix}${maxLead + 1}`;
+          return { lead_id, tarea_id: lead_id, fecha };
+        } catch {
+          return { lead_id: "-", tarea_id: "-", fecha: "-" };
+        }
+      };
+
+      const res = await fetch("/api/leads/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acEmail, searchType: searchMode, query: searchMode === "cuit" ? queryNorm : query })
+      });
+
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || `Error ${res.status}`);
+      }
+
+      const resData = await res.json();
+      setSource(resData.source);
+      
+      // Armar la estructura del estado según el resultado
+      const baseData: LeadData = {
+        acEmail,
+        cuit: searchMode === "cuit" ? queryNorm : "",
+        fuente: "", 
+        nombre: "",
+        apellido: "",
+        id_usuario: "",
+        provincia: "",
+        partido: "",
+        telefono: "",
+        email: "",
+        razon_social: "",
+        ofrecio: "0",
+        oferto: "0",
+      };
+
+
+      if (resData.source === "crm" && searchMode === "cuit" && resData.data) {
+        // Mapear un solo CRM. También generar tarea_id para associated task.
+        const dt = resData.data;
+        const crmAC = dt["ac asignado"] || dt["ac_asignado"] || dt["email ac"] || baseData.acEmail;
+        const crmLeadId = dt["#"] || dt["leadid"] || dt["lead id"] || dt["id"] || dt["numero"] || "";
+        const crmFecha = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignación"] || dt["fecha de asignacion"] || "";
+        
+        // Generar tarea_id independiente para la tarea nueva asociada a este lead CRM
+        const tareaPreview = await getPreview(acEmail);
+        
+        setData({
+          ...baseData,
+          lead_id: crmLeadId,
+          tarea_id: `${tareaPreview.lead_id}`,
+          fecha: crmFecha,
+          acEmail: crmAC,
+          nombre: dt["nombre"] || "",
+          apellido: dt["apellido"] || "",
+          id_usuario: dt["id cliente"] || dt["id_usuario"] || "",
+          provincia: dt["provincia usuario"] || dt["provincia"] || "",
+          partido: dt["partido usuario"] || dt["partido"] || "",
+          telefono: dt["teléfono"] || dt["telefono"] || "",
+          email: dt["email"] || "",
+          razon_social: dt["razón social"] || dt["razon_social"] || "",
+          fuente: dt["fuente"] || "",
+          source: "crm",
+        });
+      } else if (Array.isArray(resData.data) && resData.data.length > 0) {
+        const preview = await getPreview(baseData.acEmail);
+        
+        if (resData.data.length === 1) {
+          const dt = resData.data[0];
+          
+          let leadIdToUse = preview.lead_id;
+          let fechaToUse = preview.fecha;
+          let acToUse = baseData.acEmail;
+          let fuenteToUse = "";
+          const dtSource = dt.source || resData.source;
+
+          if (dtSource === "crm") {
+             leadIdToUse = dt["#"] || dt["leadid"] || dt["lead id"] || dt["id"] || dt["numero"] || "";
+             fechaToUse = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignacion"] || "";
+             acToUse = dt["ac asignado"] || dt["ac_asignado"] || dt["email ac"] || acToUse;
+             fuenteToUse = dt["fuente"] || "";
+          }
+
+          setData({
+            ...baseData,
+            lead_id: leadIdToUse,
+            tarea_id: preview.tarea_id,
+            fecha: fechaToUse,
+            acEmail: acToUse,
+            fuente: fuenteToUse,
+            nombre: dt.nombre || "",
+            apellido: dt.apellido || "",
+            id_usuario: dt.id_usuario || dt["id cliente"] || "",
+            provincia: dt.provincia || dt["provincia usuario"] || "",
+            partido: dt.partido || dt["partido usuario"] || "",
+            telefono: dt.telefono || dt["teléfono"] || "",
+            email: dt.email || "",
+            cuit: dt.cuit || dt["cuit"] || baseData.cuit,
+            razon_social: dt.razon_social || dt["razón social"] || "",
+            ofrecio: dt.ofrecio || "0",
+            oferto: dt.oferto || "0",
+            tarea_texto: dt.tarea_texto || computeTareaText(dt),
+            source: dtSource,
+          });
+          setSource(dtSource);
+        } else {
+          setSearchResultsOptions(resData.data);
+          setShowModal(true);
+          setData({ ...baseData, lead_id: preview.lead_id, tarea_id: preview.tarea_id, fecha: preview.fecha });
+        }
+      } else {
+        const preview = await getPreview(baseData.acEmail);
+        setData({ ...baseData, lead_id: preview.lead_id, tarea_id: preview.tarea_id, fecha: preview.fecha });
+      }
+
+      setStatus("done");
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || "Error al buscar");
+      setStatus("idle");
+    }
+  };
+
+  const handleSelectUser = (dt: any) => {
+    if (!data) return;
+    const dtSource = dt.source || source;
+    
+    let leadIdToUse = data.lead_id;
+    let fechaToUse = data.fecha;
+    let acToUse = data.acEmail;
+    let fuenteToUse = "";
+    
+    if (dtSource === "crm") {
+       leadIdToUse = dt["#"] || dt["leadid"] || dt["lead id"] || dt["id"] || dt["numero"] || "";
+       fechaToUse = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignacion"] || "";
+       acToUse = dt["ac asignado"] || dt["ac_asignado"] || dt["email ac"] || acToUse;
+       fuenteToUse = dt["fuente"] || "";
+    }
+
+    setData({
+      ...data,
+      lead_id: leadIdToUse,
+      fecha: fechaToUse,
+      acEmail: acToUse,
+      fuente: fuenteToUse,
+      nombre: dt.nombre || "",
+      apellido: dt.apellido || "",
+      id_usuario: dt.id_usuario || dt["id cliente"] || "",
+      provincia: dt.provincia || dt["provincia usuario"] || "",
+      partido: dt.partido || dt["partido usuario"] || "",
+      telefono: dt.telefono || dt["teléfono"] || "",
+      email: dt.email || "",
+      cuit: dt.cuit || dt["cuit"] || data.cuit,
+      razon_social: dt.razon_social || dt["razón social"] || "",
+      ofrecio: dt.ofrecio || "0",
+      oferto: dt.oferto || "0",
+      tarea_texto: dt.tarea_texto || computeTareaText(dt),
+      source: dtSource,
+    });
+    setSource(dtSource);
+    setShowModal(false);
+  };
+
+  const handleChangeField = (field: keyof LeadData, value: string) => {
+    if (!data) return;
+    setData({ ...data, [field]: value });
+  };
+
+  const handleCopyLead = async () => {
+    if (!data) return;
+    try {
+      setIsCopyingLead(true);
+      setErrorMsg("");
+
+      const prefix = acCodigo || data.acEmail.substring(0, 2).toUpperCase();
+      let finalLeadID = data.lead_id;
+      let finalFecha = data.fecha;
+
+      if (source !== "crm") {
+        const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
+        if (!resId.ok) throw new Error("Error al obtener último ID de leads");
+        const { maxNumber } = await resId.json();
+        
+        finalLeadID = `${prefix}${maxNumber + 1}`;
+        
+        const date = new Date();
+        const dd = String(date.getDate()).padStart(2, '0');
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const yyyy = date.getFullYear();
+        finalFecha = `${mm}/${dd}/${yyyy}`;
+      }
+
+      // A:LeadID, B:Fecha, C:AC, D:Fuente, E:Nombre, F:Apell, G:ID, H:Prov, I:Part, J:Tel, K:Email, L:CUIT, M:Razon
+      // N-V: 9 celdas vacías | W: Comentario
+      const columns = [
+        finalLeadID,
+        finalFecha,
+        data.acEmail,
+        data.fuente,
+        data.nombre,
+        data.apellido,
+        data.id_usuario,
+        data.provincia,
+        data.partido,
+        data.telefono,
+        data.email,
+        data.cuit,
+        data.razon_social,
+        "", "", "", "", "", "", "", "", "", // N-V (9 blancos)
+        data.comentario || ""               // W
+      ];
+
+      const tsvContent = columns.join('\t');
+      await navigator.clipboard.writeText(tsvContent);
+      
+      // Update UI state with real fetched values
+      setData(prev => prev ? { ...prev, lead_id: finalLeadID, fecha: finalFecha } : null);
+      
+      setCopiedLead(true);
+      setTimeout(() => setCopiedLead(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg("Error al generar TSV para Lead: " + err.message);
+    } finally {
+      setIsCopyingLead(false);
+    }
+  };
+
+  const computeTareaText = (dt: any) => {
+    if (!dt) return "";
+    const io = Number(dt.ofrecio) || 0;
+    const ia = Number(dt.oferto) || 0;
+    if (io === 1 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio y oferto tropas. Llamalo y dejá un comentario";
+    if (io === 1 && ia === 0) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio una tropa. Llamalo y dejá un comentario";
+    if (io === 0 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente oferto por una tropa. Llamalo y dejá un comentario";
+    return "¡Tenés una Nueva Sociedad asignada! Llamalo y dejá un comentario";
+  };
+  
+  const getFullNombreLead = () => {
+    if (!data) return "";
+    let fullName = data.razon_social;
+    if (data.nombre) {
+        fullName += ` - ${data.nombre}`;
+        if (data.apellido) fullName += ` ${data.apellido}`;
+    }
+    return fullName;
+  }
+
+  const handleCopyTarea = async () => {
+    if (!data) return;
+    try {
+      setIsCopyingTarea(true);
+      setErrorMsg("");
+
+      const prefix = acCodigo || acEmail.substring(0, 2).toUpperCase();
+      let finalTareaID = data.tarea_id || "";
+      
+      // Si aún no hay tarea_id generado, obtenerlo ahora
+      if (!finalTareaID || finalTareaID === "A calcular...") {
+        const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
+        if (!resId.ok) throw new Error("Error al obtener último ID de tareas");
+        const { maxNumber } = await resId.json();
+        finalTareaID = `${prefix}${maxNumber + 1}`;
+      }
+      
+      const date = new Date();
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      const finalFecha = `${mm}/${dd}/${yyyy}`;
+
+      // 1:ID Tarea, 2:ID Lead, 3:Titulo, 4:AC, 5:Tarea texto, 6:Fecha, 7:Estado
+      const columns = [
+        finalTareaID,
+        data.lead_id || "",
+        getFullNombreLead(),
+        data.acEmail,
+        data.tarea_texto || "",
+        finalFecha,
+        "Pendiente"
+      ];
+
+      const tsvContent = columns.join('\t');
+      await navigator.clipboard.writeText(tsvContent);
+      
+      setData(prev => prev ? { ...prev, tarea_id: finalTareaID } : null);
+      
+      setCopiedTarea(true);
+      setTimeout(() => setCopiedTarea(false), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg("Error al generar TSV para Tarea: " + err.message);
+    } finally {
+      setIsCopyingTarea(false);
+    }
+  };
+
+  const fieldsConfig = [
+    { label: "1. Lead ID", key: "lead_id", value: data?.lead_id || "A calcular...", readonly: false },
+    { label: "2. Fecha Asignación", key: "fecha", value: data?.fecha || "A calcular...", readonly: true },
+    { label: "3. AC asignado", key: "acEmail", type: "text", readonly: false },
+    { label: "4. Fuente", key: "fuente", type: "text", readonly: false },
+    { label: "5. Nombre", key: "nombre", type: "text", readonly: false },
+    { label: "6. Apellido", key: "apellido", type: "text", readonly: false },
+    { label: "7. ID Cliente", key: "id_usuario", type: "text", readonly: false },
+    { label: "8. Provincia", key: "provincia", type: "text", readonly: false },
+    { label: "9. Partido", key: "partido", type: "text", readonly: false },
+    { label: "10. Teléfono", key: "telefono", type: "text", readonly: false },
+    { label: "11. Email", key: "email", type: "text", readonly: false },
+    { label: "12. CUIT", key: "cuit", type: "text", readonly: true },
+    { label: "13. Razón Social", key: "razon_social", type: "text", readonly: false },
+    { label: "Comentario (col. W)", key: "comentario", type: "text", readonly: false },
+  ];
+
+  const todayFormatted = (() => {
+    const date = new Date();
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${mm}/${dd}/${yyyy}`;
+  })();
+
+  const tareaFieldsConfig = [
+    { label: "1. ID Tarea", key: "tarea_id", value: data?.tarea_id || "A calcular...", readonly: true },
+    { label: "2. ID Lead", key: "lead_id_t", value: data?.lead_id || "-", readonly: true },
+    { label: "3. Título Lead", key: "titulo", value: getFullNombreLead(), readonly: true },
+    { label: "4. AC Asignado", key: "ac_t", value: data?.acEmail || "-", readonly: true },
+    { label: "5. Tarea", key: "tarea_texto", value: data?.tarea_texto || "", type: "text", readonly: false },
+    { label: "6. Fecha Tarea", key: "fecha_t", value: todayFormatted, readonly: true },
+    { label: "7. Estado", key: "estado", value: "Pendiente", readonly: true },
+  ];
+
+  const isReadOnly = false; // Todos los campos son editables independientemente de la fuente
+
+  return (
+    <div className="p-6 max-w-5xl mx-auto animate-fade-in space-y-6">
+      
+      <div>
+        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <FilePlus className="w-6 h-6 text-primary" />
+          Crear Lead
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Búsqueda para identificar datos demográficos de clientes e inicializar seguimiento.
+        </p>
+      </div>
+
+      {/* Formulario de Búsqueda */}
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
+        
+        {/* Toggle Mode */}
+        <div className="flex bg-secondary w-fit rounded-lg p-1 border border-border">
+          <button 
+            type="button"
+            className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", searchMode === "cuit" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            onClick={() => { setSearchMode("cuit"); setQuery(""); }}
+          >
+            Buscar por CUIT
+          </button>
+          <button 
+            type="button"
+            className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", searchMode === "razon_social" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            onClick={() => { setSearchMode("razon_social"); setQuery(""); }}
+          >
+            Buscar por Razón Social
+          </button>
+          <button 
+            type="button"
+            className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", searchMode === "nombre_apellido" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            onClick={() => { setSearchMode("nombre_apellido"); setQuery(""); }}
+          >
+            Buscar por Nombre/Apellido
+          </button>
+        </div>
+
+        <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1 space-y-2 w-full" ref={dropdownRef}>
+            <label className="text-sm font-semibold text-foreground">Asociado Comercial</label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Escribe para buscar comercial..."
+                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 pr-8"
+                value={acSearchQuery}
+                onChange={(e) => {
+                  setAcSearchQuery(e.target.value);
+                  setAcEmail(""); 
+                  setIsAcDropdownOpen(true);
+                }}
+                onFocus={() => setIsAcDropdownOpen(true)}
+                required
+              />
+              <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-2.5 pointer-events-none" />
+              
+              {isAcDropdownOpen && (
+                <ul className="absolute z-50 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-60 overflow-y-auto overflow-x-hidden">
+                  {acsOptions
+                    .filter(ac => 
+                      ac.nombre.toLowerCase().includes(acSearchQuery.toLowerCase()) || 
+                      ac.email.toLowerCase().includes(acSearchQuery.toLowerCase())
+                    )
+                    .map((ac, i) => (
+                      <li
+                        key={i}
+                        className="px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 border-b border-border/50 last:border-0"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setAcEmail(ac.email);
+                          setAcCodigo(ac.codigo || "");
+                          setAcSearchQuery(`${ac.nombre} - ${ac.email}`);
+                          setIsAcDropdownOpen(false);
+                        }}
+                      >
+                        <div className="font-medium text-foreground">{ac.nombre}</div>
+                        <div className="text-xs text-muted-foreground">{ac.email}</div>
+                      </li>
+                  ))}
+                  {acsOptions.length > 0 && acsOptions.filter(ac => 
+                      ac.nombre.toLowerCase().includes(acSearchQuery.toLowerCase()) || 
+                      ac.email.toLowerCase().includes(acSearchQuery.toLowerCase())
+                    ).length === 0 && (
+                      <li className="px-3 py-4 text-sm text-center text-muted-foreground">
+                        No se encontraron analistas
+                      </li>
+                  )}
+                  {acsOptions.length === 0 && (
+                      <li className="px-3 py-4 text-sm text-center text-muted-foreground flex justify-center items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin"/> Cargando...
+                      </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex-1 space-y-2 w-full">
+            <label className="text-sm font-semibold text-foreground">
+              {searchMode === "cuit" ? "CUIT Sociedad" : searchMode === "razon_social" ? "Razón Social" : "Nombre o Apellido"}
+            </label>
+            <input
+              type="text"
+              placeholder={
+                searchMode === "cuit"
+                  ? "Sin guiones o con formato local"
+                  : searchMode === "razon_social"
+                  ? "Escribe al menos 3 caracteres..."
+                  : "Escribe nombre, apellido o ambos..."
+              }
+              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={!isSearchValid || status === "searching"}
+            className="w-full md:w-auto h-[42px] px-6 rounded-lg bg-primary text-primary-foreground font-medium flex items-center justify-center gap-2 transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {status === "searching" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Search className="w-4 h-4" />
+            )}
+            Buscar
+          </button>
+        </form>
+
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <p className={cn("flex items-center gap-1", acEmail && !isValidEmail && "text-rose-400 font-medium")}>
+            Formato Email: {isValidEmail ? "OK" : "Pendiente"}
+          </p>
+          {searchMode === "cuit" ? (
+            <p className={cn("flex items-center gap-1", query && !isValidCuit && "text-rose-400 font-medium")}>
+              CUIT: {isValidCuit ? "11 dígitos OK" : `${queryNorm.length}/11 dígitos`}
+            </p>
+          ) : searchMode === "razon_social" ? (
+            <p className={cn("flex items-center gap-1", query && !isValidRs && "text-rose-400 font-medium")}>
+              Razón Social: {isValidRs ? "OK" : "Mín. 3 caracteres"}
+            </p>
+          ) : (
+            <p className={cn("flex items-center gap-1", query && !isValidNombreApellido && "text-rose-400 font-medium")}>
+              Nombre/Apellido: {isValidNombreApellido ? "OK" : "Mín. 3 caracteres"}
+            </p>
+          )}
+          {searchMode === "nombre_apellido" && (
+            <p className="text-xs text-blue-400 flex items-center gap-1">
+              Solo busca en Metabase
+            </p>
+          )}
+        </div>
+      </div>
+
+      {errorMsg && (
+        <div className="p-4 rounded-lg bg-rose-400/10 border border-rose-400/20 text-rose-400 text-sm">
+          {errorMsg}
+        </div>
+      )}
+
+      {status === "searching" && !data && (
+        <div className="flex flex-col items-center justify-center py-10 text-muted-foreground animate-pulse">
+          <Loader2 className="w-8 h-8 text-primary animate-spin mb-3" />
+          <p>{searchMode === "nombre_apellido" ? "Consultando Metabase..." : "Consultando bases de datos (CRM, Metabase, Base Clave)..."}</p>
+        </div>
+      )}
+
+      {data && source && status === "done" && (
+        <div className="space-y-6">
+          
+          {/* SECCIÓN 1: Fila de Lead */}
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-fade-in relative z-20">
+            <div className="px-5 py-4 border-b border-border bg-secondary/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  Fila de Lead
+                  {source === "crm" && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20 uppercase tracking-wider">
+                      Lead ya registrado en CRM
+                    </span>
+                  )}
+                  {source === "metabase" && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-400 border border-blue-400/20 uppercase tracking-wider">
+                      Datos de Metabase
+                    </span>
+                  )}
+                  {source === "base_clave" && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-500 border border-emerald-400/20 uppercase tracking-wider">
+                      Datos de Base Clave
+                    </span>
+                  )}
+                  {source === "not_found" && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/10 text-amber-400 border border-amber-400/20 uppercase tracking-wider">
+                      Carga Manual
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {source === "crm" 
+                    ? "Este registro ya existe en la base. Edición deshabilitada."
+                    : "Revisa y completa todos los campos antes de copiar."}
+                </p>
+              </div>
+
+              <button
+                onClick={handleCopyLead}
+                disabled={isCopyingLead || copiedLead}
+                className={cn(
+                  "shrink-0 h-[38px] px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all",
+                  copiedLead
+                    ? "bg-positive/20 text-positive border border-positive/30"
+                    : "bg-background border border-border hover:bg-secondary text-foreground"
+                )}
+              >
+                {isCopyingLead ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedLead ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {isCopyingLead ? "Procesando..." : copiedLead ? "¡Fila copiada!" : "Copiar fila (TSV)"}
+              </button>
+            </div>
+
+            {source === "crm" && data.acEmail.toLowerCase() !== acEmail.toLowerCase() && (
+              <div className="mx-5 mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 text-sm flex items-center gap-2">
+                <Info className="w-5 h-5 shrink-0" />
+                <p>
+                  Esta sociedad ya está generada en el CRM y está asignada a <strong className="font-bold">{data.acEmail}</strong>.
+                </p>
+              </div>
+            )}
+
+            <div className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
+                {fieldsConfig.map((field) => {
+                  const isAutoReadonly = field.readonly;
+                  const valueText = field.value ? field.value : (data[field.key as keyof LeadData] as string);
+                  const isEmpty = !field.value && (!valueText || String(valueText).trim() === "");
+                  const needsAttention = isEmpty && !isAutoReadonly && !isReadOnly;
+
+                  return (
+                    <div key={field.label} className={cn(
+                      "flex flex-col gap-1.5 focus-within:relative",
+                      field.key === "fuente" && isFuenteDropdownOpen ? "z-50" : "z-10"
+                    )} ref={field.key === "fuente" ? fuenteDropdownRef : undefined}>
+                      <label className={cn("text-xs font-semibold uppercase tracking-wider", needsAttention ? "text-amber-500" : "text-muted-foreground")}>
+                        {field.label}
+                      </label>
+                      
+                      {isAutoReadonly || isReadOnly ? (
+                        <div className="px-3 py-2 bg-secondary/50 border border-border/50 rounded-lg text-sm text-muted-foreground min-h-[38px] flex items-center cursor-not-allowed">
+                          {valueText || <span className="opacity-40">-</span>}
+                        </div>
+                      ) : field.key === "fuente" ? (
+                        <div className="relative">
+                          <input
+                            type={field.type}
+                            value={valueText}
+                            onChange={(e) => {
+                              handleChangeField("fuente", e.target.value);
+                              setIsFuenteDropdownOpen(true);
+                            }}
+                            onFocus={() => setIsFuenteDropdownOpen(true)}
+                            className={cn(
+                              "w-full px-3 py-2 bg-background border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all pr-8",
+                              needsAttention ? "border-amber-500/50 bg-amber-500/5" : "border-border"
+                            )}
+                            placeholder="Completar..."
+                          />
+                          <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-2.5 pointer-events-none" />
+                          {isFuenteDropdownOpen && (
+                            <ul className="absolute z-50 mt-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto overflow-x-hidden">
+                              {fuentesOptions.filter(f => f.toLowerCase().includes(String(valueText).toLowerCase())).map((f, i) => (
+                                <li key={i} className="px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 border-b border-border/50 last:border-0 font-medium text-foreground" onMouseDown={(e) => e.preventDefault()} onClick={() => { handleChangeField("fuente", f); setIsFuenteDropdownOpen(false); }}>{f}</li>
+                              ))}
+                              {fuentesOptions.length > 0 && fuentesOptions.filter(f => f.toLowerCase().includes(String(valueText).toLowerCase())).length === 0 && (
+                                <li className="px-3 py-3 text-sm text-center text-muted-foreground">No coincidencias</li>
+                              )}
+                            </ul>
+                          )}
+                        </div>
+                      ) : (
+                        <input
+                          type={field.type}
+                          value={valueText}
+                          onChange={(e) => handleChangeField(field.key as keyof LeadData, e.target.value)}
+                          className={cn(
+                            "w-full px-3 py-2 bg-background border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all",
+                            needsAttention ? "border-amber-500/50 bg-amber-500/5" : "border-border"
+                          )}
+                          placeholder="Completar..."
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 2: Fila de Tarea (siempre visible, incluso para leads del CRM) */}
+          <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-fade-in relative z-10">
+            <div className="px-5 py-4 border-b border-border bg-secondary/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold text-foreground flex items-center gap-2">
+                  Fila de Tarea
+                  {source === "crm" && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-400 border border-violet-400/20 uppercase tracking-wider">
+                      Nueva tarea sobre lead existente
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {source === "crm"
+                    ? "El lead ya existe en el CRM. Podés crear y copiar una nueva tarea asociada a él."
+                    : "Copia esta fila en la hoja de \"Tareas\" para documentar el inicio del ciclo comercial."}
+                </p>
+              </div>
+
+              <button
+                onClick={handleCopyTarea}
+                disabled={isCopyingTarea || copiedTarea}
+                className={cn(
+                  "shrink-0 h-[38px] px-4 rounded-lg font-medium text-sm flex items-center gap-2 transition-all",
+                  copiedTarea
+                    ? "bg-positive/20 text-positive border border-positive/30"
+                    : "bg-background border border-border hover:bg-secondary text-foreground"
+                )}
+              >
+                {isCopyingTarea ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedTarea ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {isCopyingTarea ? "Procesando..." : copiedTarea ? "¡Fila copiada!" : "Copiar fila (TSV)"}
+              </button>
+            </div>
+
+            <div className="p-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
+                {tareaFieldsConfig.map((field) => (
+                  <div key={field.label} className={cn("flex flex-col gap-1.5 focus-within:relative", field.label === "5. Tarea" ? "lg:col-span-4" : "")}>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {field.label}
+                    </label>
+                    {field.readonly ? (
+                      <div className="px-3 py-2 bg-secondary/50 border border-border/50 rounded-lg text-sm text-muted-foreground min-h-[38px] flex items-center cursor-not-allowed">
+                        {field.value || <span className="opacity-40">-</span>}
+                      </div>
+                    ) : (
+                      <input
+                        type={field.type}
+                        value={field.value as string}
+                        onChange={(e) => handleChangeField(field.key as keyof LeadData, e.target.value)}
+                        className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all"
+                        placeholder="Completar..."
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* Modal Múltiples Resultados */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-lg flex flex-col overflow-hidden max-h-[80vh]">
+            <div className="p-5 border-b border-border bg-secondary/30">
+              <h3 className="font-semibold text-lg text-foreground">Múltiples resultados encontrados</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                La búsqueda encontró más de un contacto asociado. Selecciona cuál cargar:
+              </p>
+            </div>
+            <div className="overflow-y-auto p-2">
+              <div className="flex flex-col gap-2 p-3">
+                {searchResultsOptions.map((opt, idx) => {
+                  let badge = null;
+                  const itemSrc = opt.source || "metabase";
+                  if (itemSrc === "crm") {
+                    badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-400/10 text-violet-500 border border-violet-400/20 uppercase tracking-wider">CRM</span>;
+                  } else if (itemSrc === "metabase") {
+                    badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-400/10 text-blue-500 border border-blue-400/20 uppercase tracking-wider">Metabase</span>;
+                  } else if (itemSrc === "base_clave") {
+                    badge = <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/10 text-emerald-500 border border-emerald-400/20 uppercase tracking-wider">Base Clave</span>;
+                  }
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleSelectUser(opt)}
+                      className="flex flex-col text-left p-4 rounded-lg border border-border hover:border-primary hover:bg-primary/5 transition-all focus:outline-none focus:ring-2 focus:ring-primary/50"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-foreground text-sm flex items-center gap-2">
+                          {opt.razon_social || `${opt.nombre} ${opt.apellido}`.trim()}
+                          {badge}
+                        </span>
+                        <span className="text-xs text-primary font-medium flex items-center gap-1 shrink-0">
+                          Seleccionar <ChevronRight className="w-3 h-3" />
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-0.5 mt-2">
+                        {opt.cuit && <span className="text-xs text-muted-foreground"><strong className="font-medium mr-1">CUIT:</strong>{opt.cuit}</span>}
+                        {(opt.nombre || opt.apellido) && <span className="text-xs text-muted-foreground"><strong className="font-medium mr-1">Usuario:</strong>{(opt.nombre + " " + (opt.apellido || "")).trim()}</span>}
+                        {opt.id_usuario && <span className="text-xs text-muted-foreground"><strong className="font-medium mr-1">ID Usuario:</strong>{opt.id_usuario}</span>}
+                        {opt.email && <span className="text-xs text-muted-foreground"><strong className="font-medium mr-1">Email:</strong>{opt.email}</span>}
+                        {opt.ultimo_ingreso && (
+                          <span className="text-xs text-muted-foreground">
+                            <strong className="font-medium mr-1">Último ingreso:</strong>
+                            {new Date(opt.ultimo_ingreso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="p-4 border-t border-border bg-secondary/30 flex justify-end">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-secondary transition-all"
+              >
+                Cerrar y cargar vacío
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}
+

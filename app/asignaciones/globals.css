@@ -1,0 +1,88 @@
+@import "../../styles/tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: var(--surfaceL0Page);
+    --foreground: var(--contentPrimary);
+    
+    --card: var(--surfaceL2);
+    --card-foreground: var(--contentPrimary);
+    
+    --primary: var(--brand);
+    --primary-foreground: var(--contentPrimaryInverse);
+    
+    --secondary: var(--backgroundSecondary);
+    --secondary-foreground: var(--contentPrimary);
+    
+    --muted: var(--backgroundTertiary);
+    --muted-foreground: var(--contentSecondary);
+    
+    --accent: var(--brandSecondary);
+    --accent-foreground: var(--contentPrimaryInverse);
+    
+    --destructive: var(--negative);
+    --destructive-foreground: var(--contentPrimaryInverse);
+    
+    --positive-foreground: var(--contentPrimaryInverse);
+    
+    --warning: var(--backgroundWarning);
+    --warning-foreground: var(--contentPrimaryInverse);
+    
+    --notice: var(--backgroundNotice);
+    --notice-foreground: var(--contentPrimaryInverse);
+    
+    --border: var(--borderSecondary);
+    --input: var(--borderSecondary);
+    --ring: var(--brand);
+    
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: rgba(255, 255, 255, 0.5);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+  .glow-green {
+    box-shadow: 0 0 20px rgba(84, 162, 43, 0.15);
+  }
+  .text-gradient {
+    color: hsl(var(--brand));
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+}
