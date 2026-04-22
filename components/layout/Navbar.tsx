@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -168,7 +168,7 @@ export default function Navbar() {
                   <button
                     key={s.cuit}
                     onClick={() => {
-                      router.push(`/cliente/${s.cuit}`);
+                      router.push(`/asignaciones/cliente/${s.cuit}`);
                       setQuery("");
                       setShowResults(false);
                     }}

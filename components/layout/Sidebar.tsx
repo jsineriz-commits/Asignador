@@ -8,14 +8,17 @@ import {
   ChevronLeft,
   ChevronRight,
   FilePlus,
+  Beef,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/crear-lead", label: "Crear Lead", icon: FilePlus }
+  { href: "/asignaciones", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/asignaciones/crear-lead", label: "Crear Lead", icon: FilePlus },
+  { href: "/asignaciones/gns-ofertantes", label: "GNS Ofertantes", icon: Beef },
 ];
+
 
 export default function Sidebar() {
   const pathname = usePathname();

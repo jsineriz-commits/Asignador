@@ -1,6 +1,7 @@
 ﻿"use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search, Copy, Check, Info, FilePlus, Loader2, ChevronRight, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,11 +24,14 @@ type LeadData = {
   ofrecio?: string;
   oferto?: string;
   comentario?: string;
+  creado_por?: string;
+  creado_por_tarea?: string;
+  tipo_tarea?: string;
   source?: string;
   [key: string]: any;
 };
 
-export default function CrearLeadPage() {
+function CrearLeadPageContent() {
   const [acEmail, setAcEmail] = useState("");
   const [acCodigo, setAcCodigo] = useState("");
   const [acSearchQuery, setAcSearchQuery] = useState("");
@@ -39,8 +43,15 @@ export default function CrearLeadPage() {
   const [isFuenteDropdownOpen, setIsFuenteDropdownOpen] = useState(false);
   const fuenteDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [tiposOptions, setTiposOptions] = useState<string[]>([]);
+  const [isTipoDropdownOpen, setIsTipoDropdownOpen] = useState(false);
+  const tipoDropdownRef = useRef<HTMLDivElement>(null);
+
   const [searchMode, setSearchMode] = useState<"cuit" | "razon_social" | "nombre_apellido">("cuit");
   const [query, setQuery] = useState("");
+
+  // Guarda el email del AC que llegÃ³ por URL (se aplica cuando acsOptions cargue)
+  const [pendingAcEmail, setPendingAcEmail] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/acs")
@@ -52,7 +63,46 @@ export default function CrearLeadPage() {
       .then(res => res.json())
       .then(d => setFuentesOptions(d.fuentes || []))
       .catch(e => console.error("Error cargando fuentes", e));
+
+    fetch("/api/tipos-tarea")
+      .then(res => res.json())
+      .then(d => setTiposOptions(d.tipos || []))
+      .catch(e => console.error("Error cargando tipos de tarea", e));
   }, []);
+
+  // Leer CUIT y AC pre-completados desde query params (venimos de GNS Ofertantes)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const cuitParam = searchParams.get("cuit");
+    if (cuitParam) {
+      const clean = cuitParam.replace(/\D/g, "");
+      if (clean.length === 11) {
+        setSearchMode("cuit");
+        setQuery(clean);
+      }
+    }
+    const acParam = searchParams.get("ac");
+    if (acParam) setPendingAcEmail(acParam);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Cuando los ACs cargan, pre-completar el selector si tenemos un AC pendiente
+  useEffect(() => {
+    if (!pendingAcEmail || acsOptions.length === 0) return;
+    const match = acsOptions.find(
+      (ac) => ac.email.toLowerCase() === pendingAcEmail.toLowerCase()
+    );
+    if (match) {
+      setAcEmail(match.email);
+      setAcCodigo(match.codigo || "");
+      setAcSearchQuery(`${match.nombre} - ${match.email}`);
+    } else {
+      // Si no hay match exacto, al menos pre-cargamos el email en bruto
+      setAcEmail(pendingAcEmail);
+      setAcSearchQuery(pendingAcEmail);
+    }
+    setPendingAcEmail(null); // limpiar para no re-aplicar
+  }, [acsOptions, pendingAcEmail]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -61,6 +111,9 @@ export default function CrearLeadPage() {
       }
       if (fuenteDropdownRef.current && !fuenteDropdownRef.current.contains(e.target as Node)) {
         setIsFuenteDropdownOpen(false);
+      }
+      if (tipoDropdownRef.current && !tipoDropdownRef.current.contains(e.target as Node)) {
+        setIsTipoDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -79,7 +132,7 @@ export default function CrearLeadPage() {
   const [copiedTarea, setCopiedTarea] = useState(false);
   const [isCopyingTarea, setIsCopyingTarea] = useState(false);
 
-  // Selector múltiple
+  // Selector mÃºltiple
   const [searchResultsOptions, setSearchResultsOptions] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
 
@@ -104,7 +157,7 @@ export default function CrearLeadPage() {
     try {
       setStatus("searching");
       
-      // Función helper para preview
+      // FunciÃ³n helper para preview
       const getPreview = async (email: string) => {
         try {
           const prefix = acCodigo || email.substring(0, 2).toUpperCase();
@@ -141,7 +194,7 @@ export default function CrearLeadPage() {
       const resData = await res.json();
       setSource(resData.source);
       
-      // Armar la estructura del estado según el resultado
+      // Armar la estructura del estado segÃºn el resultado
       const baseData: LeadData = {
         acEmail,
         cuit: searchMode === "cuit" ? queryNorm : "",
@@ -160,11 +213,11 @@ export default function CrearLeadPage() {
 
 
       if (resData.source === "crm" && searchMode === "cuit" && resData.data) {
-        // Mapear un solo CRM. También generar tarea_id para associated task.
+        // Mapear un solo CRM. TambiÃ©n generar tarea_id para associated task.
         const dt = resData.data;
         const crmAC = dt["ac asignado"] || dt["ac_asignado"] || dt["email ac"] || baseData.acEmail;
         const crmLeadId = dt["#"] || dt["leadid"] || dt["lead id"] || dt["id"] || dt["numero"] || "";
-        const crmFecha = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignación"] || dt["fecha de asignacion"] || "";
+        const crmFecha = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignaciÃ³n"] || dt["fecha de asignacion"] || "";
         
         // Generar tarea_id independiente para la tarea nueva asociada a este lead CRM
         const tareaPreview = await getPreview(acEmail);
@@ -180,9 +233,9 @@ export default function CrearLeadPage() {
           id_usuario: dt["id cliente"] || dt["id_usuario"] || "",
           provincia: dt["provincia usuario"] || dt["provincia"] || "",
           partido: dt["partido usuario"] || dt["partido"] || "",
-          telefono: dt["teléfono"] || dt["telefono"] || "",
+          telefono: dt["telÃ©fono"] || dt["telefono"] || "",
           email: dt["email"] || "",
-          razon_social: dt["razón social"] || dt["razon_social"] || "",
+          razon_social: dt["razÃ³n social"] || dt["razon_social"] || "",
           fuente: dt["fuente"] || "",
           source: "crm",
         });
@@ -217,10 +270,10 @@ export default function CrearLeadPage() {
             id_usuario: dt.id_usuario || dt["id cliente"] || "",
             provincia: dt.provincia || dt["provincia usuario"] || "",
             partido: dt.partido || dt["partido usuario"] || "",
-            telefono: dt.telefono || dt["teléfono"] || "",
+            telefono: dt.telefono || dt["telÃ©fono"] || "",
             email: dt.email || "",
             cuit: dt.cuit || dt["cuit"] || baseData.cuit,
-            razon_social: dt.razon_social || dt["razón social"] || "",
+            razon_social: dt.razon_social || dt["razÃ³n social"] || "",
             ofrecio: dt.ofrecio || "0",
             oferto: dt.oferto || "0",
             tarea_texto: dt.tarea_texto || computeTareaText(dt),
@@ -272,10 +325,10 @@ export default function CrearLeadPage() {
       id_usuario: dt.id_usuario || dt["id cliente"] || "",
       provincia: dt.provincia || dt["provincia usuario"] || "",
       partido: dt.partido || dt["partido usuario"] || "",
-      telefono: dt.telefono || dt["teléfono"] || "",
+      telefono: dt.telefono || dt["telÃ©fono"] || "",
       email: dt.email || "",
       cuit: dt.cuit || dt["cuit"] || data.cuit,
-      razon_social: dt.razon_social || dt["razón social"] || "",
+      razon_social: dt.razon_social || dt["razÃ³n social"] || "",
       ofrecio: dt.ofrecio || "0",
       oferto: dt.oferto || "0",
       tarea_texto: dt.tarea_texto || computeTareaText(dt),
@@ -302,7 +355,7 @@ export default function CrearLeadPage() {
 
       if (source !== "crm") {
         const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
-        if (!resId.ok) throw new Error("Error al obtener último ID de leads");
+        if (!resId.ok) throw new Error("Error al obtener Ãºltimo ID de leads");
         const { maxNumber } = await resId.json();
         
         finalLeadID = `${prefix}${maxNumber + 1}`;
@@ -315,7 +368,7 @@ export default function CrearLeadPage() {
       }
 
       // A:LeadID, B:Fecha, C:AC, D:Fuente, E:Nombre, F:Apell, G:ID, H:Prov, I:Part, J:Tel, K:Email, L:CUIT, M:Razon
-      // N-V: 9 celdas vacías | W: Comentario
+      // N-V: 9 celdas vacÃ­as | W: Comentario | X-AD: 7 celdas vacÃ­as | AE: Creado Por
       const columns = [
         finalLeadID,
         finalFecha,
@@ -331,7 +384,9 @@ export default function CrearLeadPage() {
         data.cuit,
         data.razon_social,
         "", "", "", "", "", "", "", "", "", // N-V (9 blancos)
-        data.comentario || ""               // W
+        data.comentario || "",              // W
+        "", "", "", "", "", "", "",         // X-AD (7 blancos)
+        data.creado_por || ""              // AE
       ];
 
       const tsvContent = columns.join('\t');
@@ -354,10 +409,10 @@ export default function CrearLeadPage() {
     if (!dt) return "";
     const io = Number(dt.ofrecio) || 0;
     const ia = Number(dt.oferto) || 0;
-    if (io === 1 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio y oferto tropas. Llamalo y dejá un comentario";
-    if (io === 1 && ia === 0) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio una tropa. Llamalo y dejá un comentario";
-    if (io === 0 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente oferto por una tropa. Llamalo y dejá un comentario";
-    return "¡Tenés una Nueva Sociedad asignada! Llamalo y dejá un comentario";
+    if (io === 1 && ia === 1) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente ofrecio y oferto tropas. Llamalo y dejÃ¡ un comentario";
+    if (io === 1 && ia === 0) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente ofrecio una tropa. Llamalo y dejÃ¡ un comentario";
+    if (io === 0 && ia === 1) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente oferto por una tropa. Llamalo y dejÃ¡ un comentario";
+    return "Â¡TenÃ©s una Nueva Sociedad asignada! Llamalo y dejÃ¡ un comentario";
   };
   
   const getFullNombreLead = () => {
@@ -379,10 +434,10 @@ export default function CrearLeadPage() {
       const prefix = acCodigo || acEmail.substring(0, 2).toUpperCase();
       let finalTareaID = data.tarea_id || "";
       
-      // Si aún no hay tarea_id generado, obtenerlo ahora
+      // Si aÃºn no hay tarea_id generado, obtenerlo ahora
       if (!finalTareaID || finalTareaID === "A calcular...") {
         const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
-        if (!resId.ok) throw new Error("Error al obtener último ID de tareas");
+        if (!resId.ok) throw new Error("Error al obtener Ãºltimo ID de tareas");
         const { maxNumber } = await resId.json();
         finalTareaID = `${prefix}${maxNumber + 1}`;
       }
@@ -393,15 +448,23 @@ export default function CrearLeadPage() {
       const yyyy = date.getFullYear();
       const finalFecha = `${mm}/${dd}/${yyyy}`;
 
-      // 1:ID Tarea, 2:ID Lead, 3:Titulo, 4:AC, 5:Tarea texto, 6:Fecha, 7:Estado
+      // A:ID Tarea, B:ID Lead, C:Titulo, D:AC, E:Tarea texto, F:Fecha, G:Estado
+      // H: vaciÃ³ | I: Creado Por | J-K: vacÃ­os | L: Tipo
+      const finalTitulo = data.titulo_tarea ?? getFullNombreLead();
+      const finalFechaTarea = data.fecha_tarea ?? finalFecha;
+      const finalEstado = data.estado_tarea ?? "Pendiente";
       const columns = [
         finalTareaID,
         data.lead_id || "",
-        getFullNombreLead(),
+        finalTitulo,
         data.acEmail,
         data.tarea_texto || "",
-        finalFecha,
-        "Pendiente"
+        finalFechaTarea,
+        finalEstado,
+        "",                          // H (vacÃ­o)
+        data.creado_por_tarea || "", // I: Creado Por
+        "", "",                      // J-K (vacÃ­os)
+        data.tipo_tarea || ""        // L: Tipo
       ];
 
       const tsvContent = columns.join('\t');
@@ -421,7 +484,7 @@ export default function CrearLeadPage() {
 
   const fieldsConfig = [
     { label: "1. Lead ID", key: "lead_id", value: data?.lead_id || "A calcular...", readonly: false },
-    { label: "2. Fecha Asignación", key: "fecha", value: data?.fecha || "A calcular...", readonly: true },
+    { label: "2. Fecha AsignaciÃ³n", key: "fecha", value: data?.fecha || "A calcular...", readonly: false },
     { label: "3. AC asignado", key: "acEmail", type: "text", readonly: false },
     { label: "4. Fuente", key: "fuente", type: "text", readonly: false },
     { label: "5. Nombre", key: "nombre", type: "text", readonly: false },
@@ -429,11 +492,12 @@ export default function CrearLeadPage() {
     { label: "7. ID Cliente", key: "id_usuario", type: "text", readonly: false },
     { label: "8. Provincia", key: "provincia", type: "text", readonly: false },
     { label: "9. Partido", key: "partido", type: "text", readonly: false },
-    { label: "10. Teléfono", key: "telefono", type: "text", readonly: false },
+    { label: "10. TelÃ©fono", key: "telefono", type: "text", readonly: false },
     { label: "11. Email", key: "email", type: "text", readonly: false },
-    { label: "12. CUIT", key: "cuit", type: "text", readonly: true },
-    { label: "13. Razón Social", key: "razon_social", type: "text", readonly: false },
+    { label: "12. CUIT", key: "cuit", type: "text", readonly: false },
+    { label: "13. RazÃ³n Social", key: "razon_social", type: "text", readonly: false },
     { label: "Comentario (col. W)", key: "comentario", type: "text", readonly: false },
+    { label: "Creado Por (col. AE)", key: "creado_por", type: "select", readonly: false },
   ];
 
   const todayFormatted = (() => {
@@ -445,13 +509,15 @@ export default function CrearLeadPage() {
   })();
 
   const tareaFieldsConfig = [
-    { label: "1. ID Tarea", key: "tarea_id", value: data?.tarea_id || "A calcular...", readonly: true },
-    { label: "2. ID Lead", key: "lead_id_t", value: data?.lead_id || "-", readonly: true },
-    { label: "3. Título Lead", key: "titulo", value: getFullNombreLead(), readonly: true },
-    { label: "4. AC Asignado", key: "ac_t", value: data?.acEmail || "-", readonly: true },
+    { label: "1. ID Tarea", key: "tarea_id", value: data?.tarea_id || "A calcular...", readonly: false },
+    { label: "2. ID Lead", key: "lead_id", value: data?.lead_id || "-", readonly: false },
+    { label: "3. TÃ­tulo Lead", key: "titulo_tarea", value: data?.titulo_tarea ?? getFullNombreLead(), readonly: false },
+    { label: "4. AC Asignado", key: "acEmail", value: data?.acEmail || "-", readonly: false },
     { label: "5. Tarea", key: "tarea_texto", value: data?.tarea_texto || "", type: "text", readonly: false },
-    { label: "6. Fecha Tarea", key: "fecha_t", value: todayFormatted, readonly: true },
-    { label: "7. Estado", key: "estado", value: "Pendiente", readonly: true },
+    { label: "6. Fecha Tarea", key: "fecha_tarea", value: data?.fecha_tarea ?? todayFormatted, readonly: false },
+    { label: "7. Estado", key: "estado_tarea", value: data?.estado_tarea ?? "Pendiente", readonly: false },
+    { label: "Creado Por (col. I)", key: "creado_por_tarea", value: data?.creado_por_tarea || "", type: "select", readonly: false },
+    { label: "Tipo (col. L)", key: "tipo_tarea", value: data?.tipo_tarea || "", type: "combobox", readonly: false },
   ];
 
   const isReadOnly = false; // Todos los campos son editables independientemente de la fuente
@@ -465,11 +531,11 @@ export default function CrearLeadPage() {
           Crear Lead
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Búsqueda para identificar datos demográficos de clientes e inicializar seguimiento.
+          BÃºsqueda para identificar datos demogrÃ¡ficos de clientes e inicializar seguimiento.
         </p>
       </div>
 
-      {/* Formulario de Búsqueda */}
+      {/* Formulario de BÃºsqueda */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         
         {/* Toggle Mode */}
@@ -486,7 +552,7 @@ export default function CrearLeadPage() {
             className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", searchMode === "razon_social" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
             onClick={() => { setSearchMode("razon_social"); setQuery(""); }}
           >
-            Buscar por Razón Social
+            Buscar por RazÃ³n Social
           </button>
           <button 
             type="button"
@@ -559,7 +625,7 @@ export default function CrearLeadPage() {
           
           <div className="flex-1 space-y-2 w-full">
             <label className="text-sm font-semibold text-foreground">
-              {searchMode === "cuit" ? "CUIT Sociedad" : searchMode === "razon_social" ? "Razón Social" : "Nombre o Apellido"}
+              {searchMode === "cuit" ? "CUIT Sociedad" : searchMode === "razon_social" ? "RazÃ³n Social" : "Nombre o Apellido"}
             </label>
             <input
               type="text"
@@ -597,15 +663,15 @@ export default function CrearLeadPage() {
           </p>
           {searchMode === "cuit" ? (
             <p className={cn("flex items-center gap-1", query && !isValidCuit && "text-rose-400 font-medium")}>
-              CUIT: {isValidCuit ? "11 dígitos OK" : `${queryNorm.length}/11 dígitos`}
+              CUIT: {isValidCuit ? "11 dÃ­gitos OK" : `${queryNorm.length}/11 dÃ­gitos`}
             </p>
           ) : searchMode === "razon_social" ? (
             <p className={cn("flex items-center gap-1", query && !isValidRs && "text-rose-400 font-medium")}>
-              Razón Social: {isValidRs ? "OK" : "Mín. 3 caracteres"}
+              RazÃ³n Social: {isValidRs ? "OK" : "MÃ­n. 3 caracteres"}
             </p>
           ) : (
             <p className={cn("flex items-center gap-1", query && !isValidNombreApellido && "text-rose-400 font-medium")}>
-              Nombre/Apellido: {isValidNombreApellido ? "OK" : "Mín. 3 caracteres"}
+              Nombre/Apellido: {isValidNombreApellido ? "OK" : "MÃ­n. 3 caracteres"}
             </p>
           )}
           {searchMode === "nombre_apellido" && (
@@ -632,7 +698,7 @@ export default function CrearLeadPage() {
       {data && source && status === "done" && (
         <div className="space-y-6">
           
-          {/* SECCIÓN 1: Fila de Lead */}
+          {/* SECCIÃ“N 1: Fila de Lead */}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-fade-in relative z-20">
             <div className="px-5 py-4 border-b border-border bg-secondary/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -660,9 +726,7 @@ export default function CrearLeadPage() {
                   )}
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {source === "crm" 
-                    ? "Este registro ya existe en la base. Edición deshabilitada."
-                    : "Revisa y completa todos los campos antes de copiar."}
+                  {"Revisa y completa todos los campos antes de copiar."}
                 </p>
               </div>
 
@@ -677,7 +741,7 @@ export default function CrearLeadPage() {
                 )}
               >
                 {isCopyingLead ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedLead ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {isCopyingLead ? "Procesando..." : copiedLead ? "¡Fila copiada!" : "Copiar fila (TSV)"}
+                {isCopyingLead ? "Procesando..." : copiedLead ? "Â¡Fila copiada!" : "Copiar fila (TSV)"}
               </button>
             </div>
 
@@ -685,7 +749,7 @@ export default function CrearLeadPage() {
               <div className="mx-5 mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 text-sm flex items-center gap-2">
                 <Info className="w-5 h-5 shrink-0" />
                 <p>
-                  Esta sociedad ya está generada en el CRM y está asignada a <strong className="font-bold">{data.acEmail}</strong>.
+                  Esta sociedad ya estÃ¡ generada en el CRM y estÃ¡ asignada a <strong className="font-bold">{data.acEmail}</strong>.
                 </p>
               </div>
             )}
@@ -739,6 +803,25 @@ export default function CrearLeadPage() {
                             </ul>
                           )}
                         </div>
+                      ) : field.key === "creado_por" ? (
+                        <div className="relative">
+                          <select
+                            value={valueText || ""}
+                            onChange={(e) => handleChangeField("creado_por", e.target.value)}
+                            className={cn(
+                              "w-full px-3 py-2 bg-background border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none pr-8",
+                              needsAttention ? "border-amber-500/50 bg-amber-500/5" : "border-border"
+                            )}
+                          >
+                            <option value="">Seleccionar...</option>
+                            <option value="jtonon@decampoacampo.com">jtonon@decampoacampo.com</option>
+                            <option value="ptaffarel@decampoacampo.com">ptaffarel@decampoacampo.com</option>
+                            <option value="jsineriz@decampoacampo.com">jsineriz@decampoacampo.com</option>
+                            <option value="sdewey@decampoacampo.com">sdewey@decampoacampo.com</option>
+                            <option value="arivas@decampoacampo.com">arivas@decampoacampo.com</option>
+                          </select>
+                          <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-2.5 pointer-events-none" />
+                        </div>
                       ) : (
                         <input
                           type={field.type}
@@ -758,7 +841,7 @@ export default function CrearLeadPage() {
             </div>
           </div>
 
-          {/* SECCIÓN 2: Fila de Tarea (siempre visible, incluso para leads del CRM) */}
+          {/* SECCIÃ“N 2: Fila de Tarea (siempre visible, incluso para leads del CRM) */}
           <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden animate-fade-in relative z-10">
             <div className="px-5 py-4 border-b border-border bg-secondary/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
@@ -772,7 +855,7 @@ export default function CrearLeadPage() {
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   {source === "crm"
-                    ? "El lead ya existe en el CRM. Podés crear y copiar una nueva tarea asociada a él."
+                    ? "El lead ya existe en el CRM. PodÃ©s crear y copiar una nueva tarea asociada a Ã©l."
                     : "Copia esta fila en la hoja de \"Tareas\" para documentar el inicio del ciclo comercial."}
                 </p>
               </div>
@@ -788,24 +871,88 @@ export default function CrearLeadPage() {
                 )}
               >
                 {isCopyingTarea ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedTarea ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {isCopyingTarea ? "Procesando..." : copiedTarea ? "¡Fila copiada!" : "Copiar fila (TSV)"}
+                {isCopyingTarea ? "Procesando..." : copiedTarea ? "Â¡Fila copiada!" : "Copiar fila (TSV)"}
               </button>
             </div>
 
             <div className="p-5">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4">
                 {tareaFieldsConfig.map((field) => (
-                  <div key={field.label} className={cn("flex flex-col gap-1.5 focus-within:relative", field.label === "5. Tarea" ? "lg:col-span-4" : "")}>
+                  <div
+                    key={field.label}
+                    className={cn(
+                      "flex flex-col gap-1.5 focus-within:relative",
+                      field.label === "5. Tarea" ? "lg:col-span-4" : "",
+                      field.type === "combobox" ? "z-30" : field.type === "select" ? "" : ""
+                    )}
+                    ref={field.type === "combobox" ? tipoDropdownRef : undefined}
+                  >
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {field.label}
                     </label>
-                    {field.readonly ? (
-                      <div className="px-3 py-2 bg-secondary/50 border border-border/50 rounded-lg text-sm text-muted-foreground min-h-[38px] flex items-center cursor-not-allowed">
-                        {field.value || <span className="opacity-40">-</span>}
+
+                    {field.type === "select" ? (
+                      <div className="relative">
+                        <select
+                          value={field.value as string}
+                          onChange={(e) => handleChangeField(field.key as keyof LeadData, e.target.value)}
+                          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all appearance-none pr-8"
+                        >
+                          <option value="">Seleccionar...</option>
+                          <option value="jtonon@decampoacampo.com">jtonon@decampoacampo.com</option>
+                          <option value="ptaffarel@decampoacampo.com">ptaffarel@decampoacampo.com</option>
+                          <option value="jsineriz@decampoacampo.com">jsineriz@decampoacampo.com</option>
+                          <option value="sdewey@decampoacampo.com">sdewey@decampoacampo.com</option>
+                          <option value="arivas@decampoacampo.com">arivas@decampoacampo.com</option>
+                        </select>
+                        <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-2.5 pointer-events-none" />
+                      </div>
+                    ) : field.type === "combobox" ? (
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={field.value as string}
+                          onChange={(e) => {
+                            handleChangeField(field.key as keyof LeadData, e.target.value);
+                            setIsTipoDropdownOpen(true);
+                          }}
+                          onFocus={() => setIsTipoDropdownOpen(true)}
+                          className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all pr-8"
+                          placeholder="Escribe o selecciona..."
+                        />
+                        <ChevronDown className="w-4 h-4 text-muted-foreground absolute right-3 top-2.5 pointer-events-none" />
+                        {isTipoDropdownOpen && (
+                          <ul className="absolute z-50 bottom-full mb-1 w-full bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto overflow-x-hidden">
+                            {tiposOptions
+                              .filter(t => t.toLowerCase().includes(String(field.value || "").toLowerCase()))
+                              .map((t, i) => (
+                                <li
+                                  key={i}
+                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-primary/10 border-b border-border/50 last:border-0 font-medium text-foreground"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    handleChangeField("tipo_tarea", t);
+                                    setIsTipoDropdownOpen(false);
+                                  }}
+                                >
+                                  {t}
+                                </li>
+                              ))}
+                            {tiposOptions.length > 0 &&
+                              tiposOptions.filter(t => t.toLowerCase().includes(String(field.value || "").toLowerCase())).length === 0 && (
+                              <li className="px-3 py-3 text-sm text-center text-muted-foreground">No coincidencias â€” se guardarÃ¡ el texto ingresado</li>
+                            )}
+                            {tiposOptions.length === 0 && (
+                              <li className="px-3 py-4 text-sm text-center text-muted-foreground flex justify-center items-center gap-2">
+                                <Loader2 className="w-3 h-3 animate-spin" /> Cargando...
+                              </li>
+                            )}
+                          </ul>
+                        )}
                       </div>
                     ) : (
                       <input
-                        type={field.type}
+                        type={field.type || "text"}
                         value={field.value as string}
                         onChange={(e) => handleChangeField(field.key as keyof LeadData, e.target.value)}
                         className="w-full px-3 py-2 bg-background border border-border rounded-lg text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/50 transition-all"
@@ -821,14 +968,14 @@ export default function CrearLeadPage() {
         </div>
       )}
 
-      {/* Modal Múltiples Resultados */}
+      {/* Modal MÃºltiples Resultados */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-lg flex flex-col overflow-hidden max-h-[80vh]">
             <div className="p-5 border-b border-border bg-secondary/30">
-              <h3 className="font-semibold text-lg text-foreground">Múltiples resultados encontrados</h3>
+              <h3 className="font-semibold text-lg text-foreground">MÃºltiples resultados encontrados</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                La búsqueda encontró más de un contacto asociado. Selecciona cuál cargar:
+                La bÃºsqueda encontrÃ³ mÃ¡s de un contacto asociado. Selecciona cuÃ¡l cargar:
               </p>
             </div>
             <div className="overflow-y-auto p-2">
@@ -866,7 +1013,7 @@ export default function CrearLeadPage() {
                         {opt.email && <span className="text-xs text-muted-foreground"><strong className="font-medium mr-1">Email:</strong>{opt.email}</span>}
                         {opt.ultimo_ingreso && (
                           <span className="text-xs text-muted-foreground">
-                            <strong className="font-medium mr-1">Último ingreso:</strong>
+                            <strong className="font-medium mr-1">Ãšltimo ingreso:</strong>
                             {new Date(opt.ultimo_ingreso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })}
                           </span>
                         )}
@@ -881,7 +1028,7 @@ export default function CrearLeadPage() {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-secondary transition-all"
               >
-                Cerrar y cargar vacío
+                Cerrar y cargar vacÃ­o
               </button>
             </div>
           </div>
@@ -889,6 +1036,14 @@ export default function CrearLeadPage() {
       )}
 
     </div>
+  );
+}
+
+export default function CrearLeadPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-muted-foreground">Cargando...</div>}>
+      <CrearLeadPageContent />
+    </Suspense>
   );
 }
 
