@@ -61,7 +61,7 @@ export async function GET() {
     const crmAvailable = !!GNS_CRM_SHEET_ID;
 
     const [ofertantesResult, leadsResult, tareasResult, informadosResult] = await Promise.allSettled([
-      fetchSheetRange(token, OFERTANTES_SHEET_ID, "ofertantes!A:Z"),
+      fetchSheetRange(token, GNS_MIRROR_SHEET_ID, "ofertantes!A:Z"),
       crmAvailable
         ? fetchSheetRange(token, GNS_CRM_SHEET_ID!, "Leads!A:Z")
         : Promise.resolve([] as string[][]),
@@ -69,7 +69,7 @@ export async function GET() {
         ? fetchSheetRange(token, GNS_CRM_SHEET_ID!, "Tareas!A:Z")
         : Promise.resolve([] as string[][]),
       // Hoja "informados" en el mismo sheet de ofertantes (col A = CUIT)
-      fetchSheetRange(token, OFERTANTES_SHEET_ID, "informados!A:A"),
+      fetchSheetRange(token, GNS_MIRROR_SHEET_ID, "informados!A:A"),
     ]);
 
     // Si el sheet de ofertantes fallÃ³, sÃ­ retornamos error
@@ -193,4 +193,5 @@ export async function GET() {
     );
   }
 }
+
 
