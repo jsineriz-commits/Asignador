@@ -35,7 +35,7 @@ export async function GET() {
 
     if (!leadsRes.ok) {
       const body = await leadsRes.text();
-      throw new Error(`Error en Sheets API (Leads): ${leadsRes.statusText} — ${body}`);
+      throw new Error(`Error en Sheets API (Leads): ${leadsRes.statusText} - ${body}`);
     }
 
     const leadsJson = await leadsRes.json();
@@ -58,7 +58,7 @@ export async function GET() {
         });
     }
 
-    // Fetch Comentarios — si la pestaña no existe, devolvemos array vacío sin romper todo
+    // Fetch Comentarios - si la pestaña no existe, devolvemos array vacío sin romper todo
     let comentarios: any[] = [];
     try {
       const comentariosUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/Comentarios!A:G`;
@@ -82,7 +82,7 @@ export async function GET() {
           });
         }
       } else {
-        // La pestaña "Comentarios" probablemente no existe aún — no es un error fatal
+        // La pestaña "Comentarios" probablemente no existe aún - no es un error fatal
         console.warn("[SHEETS_API] Pestaña Comentarios no encontrada, devolviendo vacío.");
       }
     } catch (comentariosErr) {

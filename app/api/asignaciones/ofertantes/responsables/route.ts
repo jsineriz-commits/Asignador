@@ -1,5 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
+import { fetchSheetRange } from "@/lib/sheets-fetch";
 
 const OFERTANTES_SHEET_ID = "1gP6cckD44ZS5CjZPsYYqGYU0rnQqztYFFFEm22nQU_4";
 
@@ -21,19 +22,7 @@ export async function GET() {
       "https://www.googleapis.com/auth/spreadsheets.readonly"
     );
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${OFERTANTES_SHEET_ID}/values/responsables!A:Z`;
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Sheets error: ${res.statusText} â€” ${body}`);
-    }
-
-    const json = await res.json();
-    const values: string[][] = json.values || [];
+    const values = await fetchSheetRange(token, OFERTANTES_SHEET_ID, "responsables!A:Z");
 
     if (values.length < 2) {
       return NextResponse.json({ responsables: [] });
@@ -70,4 +59,3 @@ export async function GET() {
     );
   }
 }
-

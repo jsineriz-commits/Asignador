@@ -113,7 +113,7 @@ export default function MotivosDrawer({ isOpen, onClose, data }: MotivosDrawerPr
                 filteredItems.map((item, idx) => (
                   <tr 
                     key={`${item.id_sociedad}-${idx}`} 
-                    onClick={() => router.push(`/cliente/${item.cuit || item.id_sociedad}`)}
+                    onClick={() => router.push(`/asignaciones/cliente/${item.cuit || item.id_sociedad}`)}
                     className="hover:bg-white/5 even:bg-white/[0.01] transition-colors group cursor-pointer"
                   >
                     {columns.map((col) => (

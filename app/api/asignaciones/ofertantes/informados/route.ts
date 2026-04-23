@@ -54,7 +54,7 @@ export async function POST(req: Request) {
 
     if (!appendRes.ok) {
       const body = await appendRes.text();
-      throw new Error(`Sheets append error: ${appendRes.statusText} â€” ${body}`);
+      throw new Error(`Sheets append error: ${appendRes.statusText} - ${body}`);
     }
 
     return NextResponse.json({ success: true });

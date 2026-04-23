@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, use } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, User, Fingerprint, ShieldCheck, MessageSquare, ChevronDown, ChevronUp, Table as TableIcon } from "lucide-react";
 import { 
@@ -18,7 +18,7 @@ import { getClienteDetail } from "@/lib/data-utils";
 import { useData } from "@/lib/useData";
 
 interface Props {
-  params: { cuit: string };
+  params: Promise<{ cuit: string }>;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -32,6 +32,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ClientePage({ params }: Props) {
+  const { cuit } = use(params);
   const { data, isLoading, isError } = useData();
   const [selectedEstado, setSelectedEstado] = useState("Todos");
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
@@ -41,8 +42,8 @@ export default function ClientePage({ params }: Props) {
 
   const detail = useMemo(() => {
     if (!data) return null;
-    return getClienteDetail(data, params.cuit);
-  }, [data, params.cuit]);
+    return getClienteDetail(data, cuit);
+  }, [data, cuit]);
 
   const { uniqueEstados, chartData, assignmentDateKey, availableStatuses } = useMemo(() => {
     if (!detail) return { uniqueEstados: [], chartData: [], assignmentDateKey: null, availableStatuses: [] };
@@ -188,10 +189,10 @@ export default function ClientePage({ params }: Props) {
         </div>
         <h2 className="text-xl font-bold text-foreground">Sociedad no encontrada</h2>
         <p className="text-muted-foreground mt-2 max-w-sm mb-6">
-          La sociedad con CUIT "{params.cuit}" no existe en el maestro comercial o los datos son inconsistentes.
+          La sociedad con CUIT "{cuit}" no existe en el maestro comercial o los datos son inconsistentes.
         </p>
         <Link
-          href="/"
+          href="/asignaciones"
           className="px-6 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-colors"
         >
           Volver al Dashboard
@@ -207,13 +208,13 @@ export default function ClientePage({ params }: Props) {
       {/* Navegación / Breadcrumb */}
       <div className="flex items-center gap-3">
         <Link
-          href="/"
+          href="/asignaciones"
           className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-card hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Link href="/" className="hover:text-foreground transition-colors">
+          <Link href="/asignaciones" className="hover:text-foreground transition-colors">
             Dashboard
           </Link>
           <span>/</span>
@@ -299,7 +300,7 @@ export default function ClientePage({ params }: Props) {
                   <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
                     {selectedMonth 
                       ? `Detalle Diario: ${new Date(selectedMonth + "-02T00:00:00").toLocaleDateString("es-AR", { month: "long", year: "numeric" })}` 
-                      : "Vista Mensual — Últimos 365 días"}
+                      : "Vista Mensual - Últimos 365 días"}
                   </p>
                 </div>
               </div>

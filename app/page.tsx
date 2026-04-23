@@ -30,7 +30,7 @@ export default function HubPage() {
 
         {/* Módulos */}
         <div className="hub-cards">
-          {/* Módulo A — Asignaciones */}
+          {/* Módulo A - Asignaciones */}
           <Link href="/asignaciones" className="hub-card hub-card-asignaciones">
             <div className="hub-card-icon">📋</div>
             <div className="hub-card-body">
@@ -48,7 +48,7 @@ export default function HubPage() {
             <div className="hub-card-arrow">→</div>
           </Link>
 
-          {/* Módulo B — Gestión de Sociedades */}
+          {/* Módulo B - Gestión de Sociedades */}
           <Link href="/sociedades" className="hub-card hub-card-sociedades">
             <div className="hub-card-icon">🗺️</div>
             <div className="hub-card-body">

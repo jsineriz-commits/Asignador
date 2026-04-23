@@ -8,7 +8,7 @@ export async function GET(req: Request) {
 
     if (!cuit || cuit.length !== 11) {
       return NextResponse.json(
-        { error: "CUIT invÃ¡lido o ausente" },
+        { error: "CUIT inválido o ausente" },
         { status: 400 }
       );
     }
@@ -48,7 +48,7 @@ export async function GET(req: Request) {
 
     if (!sheetsRes.ok) {
       const body = await sheetsRes.text();
-      throw new Error(`Sheets error: ${sheetsRes.status} â€” ${body}`);
+      throw new Error(`Sheets error: ${sheetsRes.status} - ${body}`);
     }
 
     const json = await sheetsRes.json();
@@ -58,14 +58,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ found: false });
     }
 
-    // Detectar Ã­ndices de columnas dinamicamente por cabecera
+    // Detectar índices de columnas dinamicamente por cabecera
     const headers = rows[0].map((h: string) => String(h).trim().toLowerCase());
     const cuitIdx = headers.findIndex((h) => h.includes("cuit"));
     const acIdx = headers.findIndex(
       (h) => h.includes("ac asignado") || h.includes("ac_asignado") || h.includes("email ac")
     );
     const leadIdIdx = headers.findIndex(
-      (h) => h === "#" || h === "leadid" || h === "lead id" || h === "id" || h === "nÃºmero" || h === "numero"
+      (h) => h === "#" || h === "leadid" || h === "lead id" || h === "id" || h === "número" || h === "numero"
     );
 
     if (cuitIdx === -1) {

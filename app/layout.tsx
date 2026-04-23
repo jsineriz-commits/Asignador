@@ -9,7 +9,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Asignador — Hub Comercial DCAC",
+  title: "Asignador - Hub Comercial DCAC",
   description: "Plataforma unificada de gestión comercial: Asignaciones y Gestión de Sociedades.",
   keywords: ["agronegocios", "asignaciones", "CRM", "gestión de sociedades", "DCAC"],
 };

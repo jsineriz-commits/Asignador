@@ -1,5 +1,5 @@
 // ============================================================
-// MOCK DATA — Estructura exacta de las fuentes reales
+// MOCK DATA - Estructura exacta de las fuentes reales
 // ============================================================
 
 // ---- Question 130: Transacciones (Metabase) ----------------
@@ -87,7 +87,7 @@ export const ASOCIADOS_COMERCIALES = [
 ];
 
 export const mockTransacciones: Transaccion[] = [
-  // SOC001 — El Ombú
+  // SOC001 - El Ombú
   { id_sociedad: "SOC001", cabezas_ofrecidas: 120, cabezas_ofertadas: 100, fecha_operacion: "2024-08-15", ESTADO: "CONCRETADA", UN: "Faena" },
   { id_sociedad: "SOC001", cabezas_ofrecidas: 80, cabezas_ofertadas: 70, fecha_operacion: "2024-09-10", ESTADO: "CONCRETADA", UN: "Faena" },
   { id_sociedad: "SOC001", cabezas_ofrecidas: 50, cabezas_ofertadas: 50, fecha_operacion: "2024-10-05", ESTADO: "NO CONCRETADA", UN: "Faena" },
@@ -97,21 +97,21 @@ export const mockTransacciones: Transaccion[] = [
   { id_sociedad: "SOC001", cabezas_ofrecidas: 110, cabezas_ofertadas: 105, fecha_operacion: "2025-02-14", ESTADO: "CONCRETADA", UN: "Faena" },
   { id_sociedad: "SOC001", cabezas_ofrecidas: 175, cabezas_ofertadas: 160, fecha_operacion: "2025-03-10", ESTADO: "CONCRETADA", UN: "Faena" },
 
-  // SOC002 — Don Pedro
+  // SOC002 - Don Pedro
   { id_sociedad: "SOC002", cabezas_ofrecidas: 300, cabezas_ofertadas: 280, fecha_operacion: "2024-09-05", ESTADO: "CONCRETADA", UN: "Invernada" },
   { id_sociedad: "SOC002", cabezas_ofrecidas: 250, cabezas_ofertadas: 0, fecha_operacion: "2024-11-01", ESTADO: "NO CONCRETADA", UN: "Invernada" },
   { id_sociedad: "SOC002", cabezas_ofrecidas: 320, cabezas_ofertadas: 310, fecha_operacion: "2025-01-15", ESTADO: "CONCRETADA", UN: "Invernada" },
   { id_sociedad: "SOC002", cabezas_ofrecidas: 190, cabezas_ofertadas: 185, fecha_operacion: "2025-03-08", ESTADO: "CONCRETADA", UN: "Invernada" },
 
-  // SOC004 — Campo Verde
+  // SOC004 - Campo Verde
   { id_sociedad: "SOC004", cabezas_ofrecidas: 450, cabezas_ofertadas: 420, fecha_operacion: "2024-07-20", ESTADO: "CONCRETADA", UN: "Mercado" },
   { id_sociedad: "SOC004", cabezas_ofrecidas: 380, cabezas_ofertadas: 370, fecha_operacion: "2024-10-15", ESTADO: "CONCRETADA", UN: "Mercado" },
   { id_sociedad: "SOC004", cabezas_ofrecidas: 500, cabezas_ofertadas: 490, fecha_operacion: "2025-02-28", ESTADO: "CONCRETADA", UN: "Mercado" },
 
-  // SOC005 — Tambos del Sur
+  // SOC005 - Tambos del Sur
   { id_sociedad: "SOC005", cabezas_ofrecidas: 60, cabezas_ofertadas: 0, fecha_operacion: "2024-06-10", ESTADO: "NO CONCRETADA", UN: "Faena" },
 
-  // SOC010 — Ganadería del Litoral
+  // SOC010 - Ganadería del Litoral
   { id_sociedad: "SOC010", cabezas_ofrecidas: 220, cabezas_ofertadas: 210, fecha_operacion: "2024-08-22", ESTADO: "CONCRETADA", UN: "Faena" },
   { id_sociedad: "SOC010", cabezas_ofrecidas: 180, cabezas_ofertadas: 175, fecha_operacion: "2024-11-30", ESTADO: "CONCRETADA", UN: "Faena" },
   { id_sociedad: "SOC010", cabezas_ofrecidas: 260, cabezas_ofertadas: 250, fecha_operacion: "2025-03-05", ESTADO: "CONCRETADA", UN: "Faena" },
@@ -124,7 +124,7 @@ export const mockTransacciones: Transaccion[] = [
 ];
 
 export const mockHistorialAsignaciones: HistorialAsignacion[] = [
-  // SOC001 — Reasignación (punto crítico para el gráfico)
+  // SOC001 - Reasignación (punto crítico para el gráfico)
   { id_sociedad: "SOC001", fecha_asignacion: "2024-07-01", AC: "Diego Méndez", tipo: "NUEVA", modificado_por: "Sistema" },
   { id_sociedad: "SOC001", fecha_asignacion: "2024-10-15", AC: "Lucas Fernández", tipo: "REASIGNACION", modificado_por: "Admin Central" },
 

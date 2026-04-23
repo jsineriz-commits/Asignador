@@ -82,7 +82,7 @@ export default function SilencioTable({ data }: SilencioTableProps) {
                   <td className="px-5 py-3">
                     {item.cuit ? (
                       <Link
-                        href={`/cliente/${item.cuit}`}
+                        href={`/asignaciones/cliente/${item.cuit}`}
                         className="font-medium text-foreground group-hover:text-primary transition-colors"
                       >
                         {item.razon_social}

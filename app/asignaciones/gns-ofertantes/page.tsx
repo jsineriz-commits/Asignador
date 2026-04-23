@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -47,8 +47,11 @@ type Ofertante = {
   partido: string;
   ultima_oferta: string;
   cuit: string;
+  responsable: string;
   [key: string]: string;
 };
+
+type Gestionada = Ofertante & { motivo_gestion: "Manual" | "CRM" };
 
 type Oferta = {
   fecha: string;
@@ -67,7 +70,7 @@ type Oferta = {
 
 const PAGE_SIZE = 15;
 
-// â”€â”€â”€ KPI Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- KPI Card -----------------------------------------------------------------
 function KPICard({
   icon: Icon,
   label,
@@ -137,7 +140,7 @@ function KPICard({
   );
 }
 
-// â”€â”€â”€ Gestionado Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Gestionado Modal ---------------------------------------------------------
 type Responsable = { nombre: string; mail: string };
 
 function GestionadoModal({
@@ -158,7 +161,7 @@ function GestionadoModal({
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
-    fetch("/api/ofertantes/responsables")
+    fetch("/api/asignaciones/ofertantes/responsables")
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -174,7 +177,7 @@ function GestionadoModal({
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await fetch("/api/ofertantes/informados", {
+      const res = await fetch("/api/asignaciones/ofertantes/informados", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cuit, responsable: selectedMail, motivo }),
@@ -228,7 +231,7 @@ function GestionadoModal({
           {submitted ? (
             <div className="flex flex-col items-center justify-center py-8 gap-3">
               <CheckCircle2 className="w-10 h-10 text-emerald-400" />
-              <p className="text-sm font-semibold text-emerald-300">Â¡Registrado correctamente!</p>
+              <p className="text-sm font-semibold text-emerald-300">¡Registrado correctamente!</p>
             </div>
           ) : (
             <>
@@ -253,7 +256,7 @@ function GestionadoModal({
                     )}
                     {responsables.map((r, i) => (
                       <option key={i} value={r.mail}>
-                        {r.nombre} â€” {r.mail}
+                        {r.nombre} - {r.mail}
                       </option>
                     ))}
                   </select>
@@ -268,7 +271,7 @@ function GestionadoModal({
                 <textarea
                   value={motivo}
                   onChange={(e) => setMotivo(e.target.value)}
-                  placeholder="DescribÃ­ brevemente el motivo de la gestiÃ³n..."
+                  placeholder="Describí brevemente el motivo de la gestión..."
                   rows={3}
                   className="w-full bg-[#0d1117] border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all resize-none"
                 />
@@ -313,7 +316,7 @@ function GestionadoModal({
   );
 }
 
-// â”€â”€â”€ Admin Reminder Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Admin Reminder Modal -----------------------------------------------------
 function AdminReminderModal({ onConfirm }: { onConfirm: () => void }) {
   return (
     <div
@@ -358,7 +361,7 @@ function AdminReminderModal({ onConfirm }: { onConfirm: () => void }) {
   );
 }
 
-// â”€â”€â”€ CRM Status Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- CRM Status Banner --------------------------------------------------------
 function CrmStatusBanner({
   crmStatus,
   crmData,
@@ -384,7 +387,7 @@ function CrmStatusBanner({
       <div className="mx-6 mt-4 flex flex-col sm:flex-row sm:items-center gap-3 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25">
         <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-emerald-300">Esta sociedad ya estÃ¡ en el CRM</p>
+          <p className="text-sm font-semibold text-emerald-300">Esta sociedad ya está en el CRM</p>
           {crmData?.acEmail && (
             <p className="text-xs text-emerald-400/70 mt-0.5 truncate">
               AC asignado: <span className="font-medium text-emerald-300">{crmData.acEmail}</span>
@@ -406,8 +409,8 @@ function CrmStatusBanner({
       <div className="mx-6 mt-4 flex flex-col sm:flex-row sm:items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25">
         <XCircle className="w-4 h-4 text-amber-400 shrink-0" />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-amber-300">Esta sociedad no estÃ¡ en el CRM</p>
-          <p className="text-xs text-amber-400/70 mt-0.5">AÃºn no tiene un comercial asignado en el sistema.</p>
+          <p className="text-sm font-semibold text-amber-300">Esta sociedad no está en el CRM</p>
+          <p className="text-xs text-amber-400/70 mt-0.5">Aún no tiene un comercial asignado en el sistema.</p>
         </div>
         <button
           onClick={onAsignar}
@@ -419,7 +422,7 @@ function CrmStatusBanner({
     );
   }
 
-  // error â€” sin acciÃ³n
+  // error - sin acción
   return (
     <div className="mx-6 mt-4 flex items-center gap-2 p-3 rounded-xl bg-white/5 border border-white/10">
       <AlertCircle className="w-4 h-4 text-slate-500 shrink-0" />
@@ -428,7 +431,7 @@ function CrmStatusBanner({
   );
 }
 
-// â”€â”€â”€ Detail Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Detail Modal --------------------------------------------------------------
 function OfertanteModal({
   ofertante,
   onClose,
@@ -463,7 +466,7 @@ function OfertanteModal({
     }
 
     // Ofertas
-    fetch(`/api/ofertantes/ofertas?cuit=${encodeURIComponent(ofertante.cuit)}`)
+    fetch(`/api/asignaciones/ofertantes/ofertas?cuit=${encodeURIComponent(ofertante.cuit)}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
@@ -473,7 +476,7 @@ function OfertanteModal({
       .finally(() => setLoadingOfertas(false));
 
     // CRM check (paralelo, no bloquea las ofertas)
-    fetch(`/api/ofertantes/crm-check?cuit=${encodeURIComponent(ofertante.cuit)}`)
+    fetch(`/api/asignaciones/ofertantes/crm-check?cuit=${encodeURIComponent(ofertante.cuit)}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.error) { setCrmStatus("error"); return; }
@@ -483,20 +486,20 @@ function OfertanteModal({
       .catch(() => setCrmStatus("error"));
   }, [ofertante.cuit]);
 
-  // Navega a Crear Lead sin AC (sociedad no estÃ¡ en CRM) â€” luego del recordatorio
+  // Navega a Crear Lead sin AC (sociedad no está en CRM) - luego del recordatorio
   const handleAsignarConfirm = useCallback(() => {
     setAdminReminderMode(null);
-    router.push(`/crear-lead?cuit=${encodeURIComponent(ofertante.cuit ?? "")}`);
+    router.push(`/asignaciones/crear-lead?cuit=${encodeURIComponent(ofertante.cuit ?? "")}`);
     onClose();
   }, [router, ofertante.cuit, onClose]);
 
-  // Navega a Crear Lead con CUIT + AC pre-completados (sociedad ya estÃ¡ en CRM)
+  // Navega a Crear Lead con CUIT + AC pre-completados (sociedad ya está en CRM)
   const handleCrearTareaConfirm = useCallback(() => {
     setAdminReminderMode(null);
     const params = new URLSearchParams();
     if (ofertante.cuit) params.set("cuit", ofertante.cuit);
     if (crmData?.acEmail) params.set("ac", crmData.acEmail);
-    router.push(`/crear-lead?${params.toString()}`);
+    router.push(`/asignaciones/crear-lead?${params.toString()}`);
     onClose();
   }, [router, ofertante.cuit, crmData, onClose]);
 
@@ -523,20 +526,20 @@ function OfertanteModal({
   const factVal = parseFloat(ofertante.facturacion);
   const factFormatted = !isNaN(factVal)
     ? `$${(factVal / 1000).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`
-    : "â€”";
+    : "-";
 
   const OFERTA_COLS = [
     { label: "Fecha Oferta", key: "fecha" },
     { label: "ID Lote", key: "id_lote" },
     { label: "Estado", key: "estado_tropa" },
-    { label: "CategorÃ­a", key: "cat_abrev" },
+    { label: "Categoría", key: "cat_abrev" },
     { label: "Raza", key: "raza_pub" },
     { label: "Tipo", key: "tipo" },
     { label: "OP", key: "operador" },
     { label: "Cabezas", key: "cantidad" },
     { label: "Peso", key: "peso" },
     { label: "Precio Oferta", key: "precio_of" },
-    { label: "Precio PublicaciÃ³n", key: "precio_pub" },
+    { label: "Precio Publicación", key: "precio_pub" },
   ];
 
   return (
@@ -565,7 +568,7 @@ function OfertanteModal({
                 </span>
               )}
               {ofertante.cuit && ofertante.usuario && (
-                <span className="text-slate-600 text-xs">Â·</span>
+                <span className="text-slate-600 text-xs">·</span>
               )}
               {ofertante.usuario && (
                 <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -610,7 +613,7 @@ function OfertanteModal({
             <div className="bg-[#161b27] border border-white/10 rounded-2xl p-4 flex flex-col gap-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">KT</p>
               <p className="text-3xl font-extrabold text-white leading-none">
-                {ofertante.Kt ? Number(ofertante.Kt).toLocaleString("es-AR") : "â€”"}
+                {ofertante.Kt ? Number(ofertante.Kt).toLocaleString("es-AR") : "-"}
               </p>
               <p className="text-[10px] text-slate-500 mt-0.5">cabezas</p>
             </div>
@@ -619,7 +622,7 @@ function OfertanteModal({
             <div className="bg-[#161b27] border border-white/10 rounded-2xl p-4 flex flex-col gap-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">KV</p>
               <p className="text-3xl font-extrabold text-white leading-none">
-                {ofertante.Kv ? Number(ofertante.Kv).toLocaleString("es-AR") : "â€”"}
+                {ofertante.Kv ? Number(ofertante.Kv).toLocaleString("es-AR") : "-"}
               </p>
               <p className="text-[10px] text-slate-500 mt-0.5">vacas</p>
             </div>
@@ -653,9 +656,9 @@ function OfertanteModal({
               <p className="text-[10px] text-slate-500">score / 1000</p>
             </div>
 
-            {/* FacturaciÃ³n */}
+            {/* Facturación */}
             <div className="bg-[#161b27] border border-white/10 rounded-2xl p-4 flex flex-col gap-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">FacturaciÃ³n</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Facturación</p>
               <p className="text-3xl font-extrabold text-white leading-none">
                 {factFormatted}
               </p>
@@ -757,41 +760,41 @@ function OfertanteModal({
                     {ofertas.map((oferta, i) => (
                       <tr key={i} className="hover:bg-white/5 transition-colors">
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
-                          {oferta.fecha || "â€”"}
+                          {oferta.fecha || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap font-mono text-primary font-semibold">
-                          {oferta.id_lote || "â€”"}
+                          {oferta.id_lote || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap">
                           <EstadoBadge estado={oferta.estado_tropa} />
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
-                          {oferta.cat_abrev || "â€”"}
+                          {oferta.cat_abrev || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
-                          {oferta.raza_pub || "â€”"}
+                          {oferta.raza_pub || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
-                          {oferta.tipo || "â€”"}
+                          {oferta.tipo || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-300">
-                          {oferta.operador || "â€”"}
+                          {oferta.operador || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-center font-mono text-white font-semibold">
-                          {oferta.cantidad || "â€”"}
+                          {oferta.cantidad || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-center font-mono text-slate-300">
-                          {oferta.peso || "â€”"}
+                          {oferta.peso || "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-right font-mono text-emerald-300 font-semibold">
                           {oferta.precio_of
                             ? `$${parseFloat(oferta.precio_of).toLocaleString("es-AR")}`
-                            : "â€”"}
+                            : "-"}
                         </td>
                         <td className="px-3 py-2.5 whitespace-nowrap text-right font-mono text-slate-400">
                           {oferta.precio_pub
                             ? `$${parseFloat(oferta.precio_pub).toLocaleString("es-AR")}`
-                            : "â€”"}
+                            : "-"}
                         </td>
                       </tr>
                     ))}
@@ -826,7 +829,7 @@ function OfertanteModal({
   );
 }
 
-// â”€â”€â”€ Info Tile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Info Tile -----------------------------------------------------------------
 function InfoTile({
   icon: Icon,
   label,
@@ -861,9 +864,9 @@ function InfoTile({
   );
 }
 
-// â”€â”€â”€ Estado Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Estado Badge --------------------------------------------------------------
 function EstadoBadge({ estado }: { estado: string }) {
-  if (!estado) return <span className="text-muted-foreground/40">â€”</span>;
+  if (!estado) return <span className="text-muted-foreground/40">-</span>;
   const e = estado.trim().toUpperCase();
   const cls =
     e.includes("VENDIDO") || e.includes("COMPRADO")
@@ -885,35 +888,42 @@ function EstadoBadge({ estado }: { estado: string }) {
   );
 }
 
-// â”€â”€â”€ Sort types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Sort types ----------------------------------------------------------------
 type SortDir = "asc" | "desc" | null;
 
 const COLUMNS: { label: string; key: keyof Ofertante | null; numeric?: boolean }[] = [
-  { label: "KT",            key: "Kt",          numeric: true },
-  { label: "KV",            key: "Kv",          numeric: true },
-  { label: "SOCIEDAD",      key: "sociedad" },
-  { label: "USUARIO",       key: "usuario" },
-  { label: "AC",            key: "AC" },
-  { label: "REP",           key: "REP" },
-  { label: "NOSIS",         key: "NOSIS",        numeric: true },
-  { label: "FACT",          key: "facturacion",  numeric: true },
-  { label: "Q OFERTAS",     key: "q_ofertas",    numeric: true },
-  { label: "Q COMPRAS",     key: "q_compras",    numeric: true },
-  { label: "PROVINCIA",     key: "provincia" },
-  { label: "PARTIDO",       key: "partido" },
-  { label: "ÃšLTIMA OFERTA", key: "ultima_oferta" },
+  { label: "KT",             key: "Kt",           numeric: true },
+  { label: "KV",             key: "Kv",           numeric: true },
+  { label: "SOCIEDAD",       key: "sociedad" },
+  { label: "USUARIO",        key: "usuario" },
+  { label: "AC",             key: "AC" },
+  { label: "REP",            key: "REP" },
+  { label: "NOSIS",          key: "NOSIS",         numeric: true },
+  { label: "FACT",           key: "facturacion",   numeric: true },
+  { label: "Q OFERTAS",      key: "q_ofertas",     numeric: true },
+  { label: "Q COMPRAS",      key: "q_compras",     numeric: true },
+  { label: "PROVINCIA",      key: "provincia" },
+  { label: "PARTIDO",        key: "partido" },
+  { label: "RESPONSABLE",    key: "responsable" },
+  { label: "ULTIMA OFERTA",  key: "ultima_oferta" },
 ];
 
-// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// --- Main Page -----------------------------------------------------------------
 export default function GNSOfertantesPage() {
+  const router = useRouter();
   const [ofertantes, setOfertantes] = useState<Ofertante[]>([]);
+  const [gestionadas, setGestionadas] = useState<Gestionada[]>([]);
+  const [activeTab, setActiveTab] = useState<"ofertantes" | "gestionadas">("ofertantes");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [searchG, setSearchG] = useState("");
   const [page, setPage] = useState(1);
+  const [pageG, setPageG] = useState(1);
   const [sortKey, setSortKey] = useState<keyof Ofertante | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [selectedOfertante, setSelectedOfertante] = useState<Ofertante | null>(null);
+  const [filterResponsable, setFilterResponsable] = useState("");
 
   const handleSort = (key: keyof Ofertante | null) => {
     if (!key) return;
@@ -932,11 +942,12 @@ export default function GNSOfertantesPage() {
   const handleCloseModal = useCallback(() => setSelectedOfertante(null), []);
 
   useEffect(() => {
-    fetch("/api/ofertantes")
+    fetch("/api/asignaciones/ofertantes")
       .then((r) => r.json())
       .then((d) => {
         if (d.error) throw new Error(d.error);
         setOfertantes(d.ofertantes || []);
+        setGestionadas(d.gestionadas || []);
       })
       .catch((e) => setError(e.message))
       .finally(() => setIsLoading(false));
@@ -955,22 +966,45 @@ export default function GNSOfertantesPage() {
     return { total, totalOfertas, sinAC };
   }, [ofertantes]);
 
-  // Filtro de bÃºsqueda
+  // Lista de responsables únicos (un ofertante puede tener "A / B")
+  const responsablesList = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of ofertantes) {
+      if (!o.responsable) continue;
+      o.responsable.split("/").forEach((r) => {
+        const t = r.trim();
+        if (t) set.add(t);
+      });
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, "es"));
+  }, [ofertantes]);
+
+  // Filtros: búsqueda de texto + responsable
   const filtered = useMemo(() => {
-    if (!search.trim()) return ofertantes;
-    const q = search.toLowerCase();
-    return ofertantes.filter(
-      (o) =>
-        o.sociedad?.toLowerCase().includes(q) ||
-        o.usuario?.toLowerCase().includes(q) ||
-        o.AC?.toLowerCase().includes(q) ||
-        o.REP?.toLowerCase().includes(q) ||
-        o.provincia?.toLowerCase().includes(q) ||
-        o.partido?.toLowerCase().includes(q) ||
-        o.Kt?.toLowerCase().includes(q) ||
-        o.Kv?.toLowerCase().includes(q)
-    );
-  }, [ofertantes, search]);
+    let list = ofertantes;
+    // Filtro por responsable
+    if (filterResponsable) {
+      list = list.filter((o) =>
+        (o.responsable ?? "").split("/").some((r) => r.trim() === filterResponsable)
+      );
+    }
+    // Filtro de búsqueda libre
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (o) =>
+          o.sociedad?.toLowerCase().includes(q) ||
+          o.usuario?.toLowerCase().includes(q) ||
+          o.AC?.toLowerCase().includes(q) ||
+          o.REP?.toLowerCase().includes(q) ||
+          o.provincia?.toLowerCase().includes(q) ||
+          o.partido?.toLowerCase().includes(q) ||
+          o.Kt?.toLowerCase().includes(q) ||
+          o.Kv?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [ofertantes, search, filterResponsable]);
 
   // Ordenamiento
   const sorted = useMemo(() => {
@@ -989,10 +1023,10 @@ export default function GNSOfertantesPage() {
     });
   }, [filtered, sortKey, sortDir]);
 
-  // Reset page on search
+  // Reset page on search or responsable filter change
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, filterResponsable]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const paginated = sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -1007,7 +1041,7 @@ export default function GNSOfertantesPage() {
             GNS Ofertantes
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Monitoreo y gestiÃ³n de sociedades ofertantes sin SAC.
+            Monitoreo y gestión de sociedades ofertantes sin SAC.
           </p>
         </div>
       </div>
@@ -1017,7 +1051,7 @@ export default function GNSOfertantesPage() {
         <KPICard
           icon={Building2}
           label="Cantidad de Sociedades"
-          value={isLoading ? "â€”" : kpis.total}
+          value={isLoading ? "-" : kpis.total}
           sub="Total de ofertantes registrados"
           accent="blue"
           isLoading={isLoading}
@@ -1025,7 +1059,7 @@ export default function GNSOfertantesPage() {
         <KPICard
           icon={ClipboardList}
           label="Cantidad de Ofertas"
-          value={isLoading ? "â€”" : kpis.totalOfertas}
+          value={isLoading ? "-" : kpis.totalOfertas}
           sub="Suma total de ofertas realizadas"
           accent="indigo"
           isLoading={isLoading}
@@ -1033,7 +1067,7 @@ export default function GNSOfertantesPage() {
         <KPICard
           icon={UserX}
           label="Sin Comercial Asignado"
-          value={isLoading ? "â€”" : kpis.sinAC}
+          value={isLoading ? "-" : kpis.sinAC}
           sub="Sociedades sin AC activo"
           accent="rose"
           isLoading={isLoading}
@@ -1052,30 +1086,84 @@ export default function GNSOfertantesPage() {
 
       {/* Tabla */}
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
-        {/* Header tabla */}
-        <div className="px-5 py-4 border-b border-border bg-secondary/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-foreground text-sm">
+        {/* Tab switcher */}
+        <div className="px-5 pt-4 pb-0 border-b border-border bg-secondary/30 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+          <div className="flex items-end gap-0">
+            <button
+              onClick={() => { setActiveTab("ofertantes"); setPage(1); }}
+              className={cn(
+                "px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                activeTab === "ofertantes"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
               Listado de Sociedades Ofertantes
-            </h2>
-            {!isLoading && (
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Mostrando {sorted.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}â€“
-                {Math.min(page * PAGE_SIZE, sorted.length)} de {sorted.length} resultados
-                <span className="ml-2 text-muted-foreground/50">Â· HacÃ© clic en una fila para ver el detalle</span>
-              </p>
-            )}
+              {!isLoading && (
+                <span className={cn(
+                  "ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                  activeTab === "ofertantes" ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                )}>
+                  {ofertantes.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab("gestionadas"); setPageG(1); }}
+              className={cn(
+                "px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                activeTab === "gestionadas"
+                  ? "border-emerald-500 text-emerald-400"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Listado de Sociedades Gestionadas
+              {!isLoading && (
+                <span className={cn(
+                  "ml-2 text-[10px] font-bold px-1.5 py-0.5 rounded-full",
+                  activeTab === "gestionadas" ? "bg-emerald-500/20 text-emerald-400" : "bg-muted text-muted-foreground"
+                )}>
+                  {gestionadas.length}
+                </span>
+              )}
+            </button>
           </div>
-          {/* Buscador */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Buscar sociedad, AC, provincia..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary transition-all"
-            />
+          {/* Controles de filtrado */}
+          <div className="flex items-center gap-2 pb-3 flex-wrap">
+            {/* Filtro Responsable (solo en tab ofertantes) */}
+            {activeTab === "ofertantes" && (
+              <select
+                value={filterResponsable}
+                onChange={(e) => { setFilterResponsable(e.target.value); setPage(1); }}
+                className="h-9 pl-3 pr-8 text-sm bg-secondary border border-border rounded-lg text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary transition-all appearance-none cursor-pointer"
+              >
+                <option value="">Todos los responsables</option>
+                {responsablesList.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            )}
+            {/* Buscador */}
+            <div className="relative w-full sm:w-64">
+              <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-2.5 pointer-events-none" />
+              {activeTab === "ofertantes" ? (
+                <input
+                  type="text"
+                  placeholder="Buscar sociedad, AC, provincia..."
+                  value={search}
+                  onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary transition-all"
+                />
+              ) : (
+                <input
+                  type="text"
+                  placeholder="Buscar en gestionadas..."
+                  value={searchG}
+                  onChange={(e) => { setSearchG(e.target.value); setPageG(1); }}
+                  className="w-full pl-9 pr-3 py-2 text-sm bg-secondary border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
+                />
+              )}
+            </div>
           </div>
         </div>
 
@@ -1087,233 +1175,370 @@ export default function GNSOfertantesPage() {
           </div>
         )}
 
-        {/* Empty state */}
-        {!isLoading && !error && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-            <Search className="w-10 h-10 mb-3 opacity-30" />
-            <p className="font-medium">Sin resultados</p>
-            <p className="text-sm mt-1">
-              {search ? "ProbÃ¡ con otro tÃ©rmino de bÃºsqueda." : "No hay datos disponibles."}
-            </p>
-          </div>
-        )}
+        {/* ==================== TAB: OFERTANTES ==================== */}
+        {activeTab === "ofertantes" && (
+          <>
+            {/* Empty state */}
+            {!isLoading && !error && filtered.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                <Search className="w-10 h-10 mb-3 opacity-30" />
+                <p className="font-medium">Sin resultados</p>
+                <p className="text-sm mt-1">
+                  {search ? "Probá con otro término de búsqueda." : "No hay datos disponibles."}
+                </p>
+              </div>
+            )}
 
-        {/* Table */}
-        {!isLoading && !error && filtered.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-secondary/20">
-                  {COLUMNS.map((col) => {
-                    const isActive = sortKey === col.key;
-                    const SortIcon = isActive
-                      ? sortDir === "asc"
-                        ? ChevronUp
-                        : ChevronDown
-                      : ChevronsUpDown;
-                    return (
-                      <th
-                        key={col.label}
-                        className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap"
-                      >
-                        <button
-                          onClick={() => handleSort(col.key)}
-                          className={cn(
-                            "flex items-center gap-1 group/sort transition-colors hover:text-foreground",
-                            isActive && "text-primary"
-                          )}
+            {/* Table */}
+            {!isLoading && !error && filtered.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border bg-secondary/20">
+                      {COLUMNS.map((col) => {
+                        const isActive = sortKey === col.key;
+                        const SortIcon = isActive
+                          ? sortDir === "asc" ? ChevronUp : ChevronDown
+                          : ChevronsUpDown;
+                        return (
+                          <th key={col.label} className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                            <button
+                              onClick={() => handleSort(col.key)}
+                              className={cn("flex items-center gap-1 group/sort transition-colors hover:text-foreground", isActive && "text-primary")}
+                            >
+                              {col.label}
+                              <SortIcon className={cn("w-3 h-3 transition-opacity", isActive ? "opacity-100" : "opacity-30 group-hover/sort:opacity-70")} />
+                            </button>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {paginated.map((o, idx) => {
+                      const sinAC = !o.AC || o.AC.trim() === "" || o.AC.trim().toUpperCase() === "SIN ASIGNAR";
+                      return (
+                        <tr
+                          key={idx}
+                          onClick={() => setSelectedOfertante(o)}
+                          className="hover:bg-secondary/40 transition-colors group cursor-pointer"
                         >
-                          {col.label}
-                          <SortIcon
-                            className={cn(
-                              "w-3 h-3 transition-opacity",
-                              isActive ? "opacity-100" : "opacity-30 group-hover/sort:opacity-70"
+                          {/* KT */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {o.Kt ? (
+                              <span className="text-xs font-mono font-semibold text-primary">{o.Kt}</span>
+                            ) : (
+                              <span className="text-muted-foreground/40">-</span>
                             )}
-                          />
-                        </button>
-                      </th>
+                          </td>
+                          {/* KV */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {o.Kv ? (
+                              <span className="text-xs font-mono text-foreground/70">{o.Kv}</span>
+                            ) : (
+                              <span className="text-muted-foreground/40">-</span>
+                            )}
+                          </td>
+                          {/* Sociedad */}
+                          <td className="px-3 py-3 min-w-[160px]">
+                            <span className="font-semibold text-foreground text-sm leading-snug group-hover:text-primary transition-colors">
+                              {o.sociedad || <span className="text-muted-foreground/40">-</span>}
+                            </span>
+                          </td>
+                          {/* Usuario */}
+                          <td className="px-3 py-3 min-w-[140px]">
+                            <span className="text-xs text-muted-foreground">
+                              {o.usuario || <span className="opacity-40">-</span>}
+                            </span>
+                          </td>
+                          {/* AC */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {sinAC ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider whitespace-nowrap">
+                                Sin Asignar
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                <span className="text-xs text-foreground">{o.AC}</span>
+                              </span>
+                            )}
+                          </td>
+                          {/* REP */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-foreground/80">
+                              {o.REP || <span className="text-muted-foreground/40">-</span>}
+                            </span>
+                          </td>
+                          {/* NOSIS */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {(() => {
+                              const n = parseFloat(o.NOSIS);
+                              if (!o.NOSIS || isNaN(n)) return <span className="text-muted-foreground/40 text-xs">N/A</span>;
+                              const color = n < 300
+                                ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                                : n <= 500
+                                ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                                : "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
+                              return <span className={cn("inline-block text-[11px] font-semibold px-2 py-0.5 rounded border font-mono", color)}>{o.NOSIS}</span>;
+                            })()}
+                          </td>
+                          {/* FACT */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {(() => {
+                              const n = parseFloat(o.facturacion);
+                              if (!o.facturacion || isNaN(n)) return <span className="text-muted-foreground/40 text-xs">-</span>;
+                              const millions = (n / 1000).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+                              return <span className="text-xs text-foreground/70 font-mono">${millions}M</span>;
+                            })()}
+                          </td>
+                          {/* Q Ofertas */}
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-primary">{o.q_ofertas || "0"}</span>
+                          </td>
+                          {/* Q Compras */}
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-emerald-400">{o.q_compras || "0"}</span>
+                          </td>
+                          {/* Provincia */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-foreground/80">
+                              {o.provincia || <span className="text-muted-foreground/40">-</span>}
+                            </span>
+                          </td>
+                          {/* Partido */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-muted-foreground">
+                              {o.partido || <span className="opacity-40">-</span>}
+                            </span>
+                          </td>
+                          {/* Responsable */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {o.responsable ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+                                {o.responsable}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/40">-</span>
+                            )}
+                          </td>
+                          {/* Ultima Oferta */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-muted-foreground font-medium">
+                              {o.ultima_oferta || <span className="opacity-40">-</span>}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Paginacion ofertantes */}
+            {!isLoading && !error && sorted.length > 0 && (
+              <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-secondary/20">
+                <p className="text-xs text-muted-foreground">
+                  Pagina {page} de {totalPages} · {sorted.length} filas
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let p: number;
+                    if (totalPages <= 5) p = i + 1;
+                    else if (page <= 3) p = i + 1;
+                    else if (page >= totalPages - 2) p = totalPages - 4 + i;
+                    else p = page - 2 + i;
+                    return (
+                      <button key={p} onClick={() => setPage(p)}
+                        className={cn("flex items-center justify-center w-8 h-8 rounded-lg text-sm font-medium transition-all",
+                          p === page ? "bg-primary text-primary-foreground" : "border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        )}>
+                        {p}
+                      </button>
                     );
                   })}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {paginated.map((o, idx) => {
-                  const sinAC =
-                    !o.AC || o.AC.trim() === "" || o.AC.trim().toUpperCase() === "SIN ASIGNAR";
-                  return (
-                    <tr
-                      key={idx}
-                      onClick={() => setSelectedOfertante(o)}
-                      className="hover:bg-secondary/40 transition-colors group cursor-pointer"
-                    >
-                      {/* KT */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {o.Kt ? (
-                          <span className="text-xs font-mono font-semibold text-primary">
-                            {o.Kt}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/40">â€”</span>
-                        )}
-                      </td>
-                      {/* KV */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {o.Kv ? (
-                          <span className="text-xs font-mono text-foreground/70">
-                            {o.Kv}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/40">â€”</span>
-                        )}
-                      </td>
-                      {/* Sociedad */}
-                      <td className="px-3 py-3 min-w-[160px]">
-                        <span className="font-semibold text-foreground text-sm leading-snug group-hover:text-primary transition-colors">
-                          {o.sociedad || <span className="text-muted-foreground/40">â€”</span>}
-                        </span>
-                      </td>
-                      {/* Usuario */}
-                      <td className="px-3 py-3 min-w-[140px]">
-                        <span className="text-xs text-muted-foreground">
-                          {o.usuario || <span className="opacity-40">â€”</span>}
-                        </span>
-                      </td>
-                      {/* AC */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {sinAC ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider whitespace-nowrap">
-                            Sin Asignar
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                            <span className="text-xs text-foreground">{o.AC}</span>
-                          </span>
-                        )}
-                      </td>
-                      {/* REP */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span className="text-xs text-foreground/80">
-                          {o.REP || <span className="text-muted-foreground/40">â€”</span>}
-                        </span>
-                      </td>
-                      {/* NOSIS */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {(() => {
-                          const n = parseFloat(o.NOSIS);
-                          if (!o.NOSIS || isNaN(n)) return <span className="text-muted-foreground/40 text-xs">N/A</span>;
-                          const color =
-                            n < 300
-                              ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
-                              : n <= 500
-                              ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                              : "bg-emerald-500/15 border-emerald-500/30 text-emerald-400";
-                          return (
-                            <span className={cn("inline-block text-[11px] font-semibold px-2 py-0.5 rounded border font-mono", color)}>
-                              {o.NOSIS}
-                            </span>
-                          );
-                        })()}
-                      </td>
-                      {/* FACT */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        {(() => {
-                          const n = parseFloat(o.facturacion);
-                          if (!o.facturacion || isNaN(n)) return <span className="text-muted-foreground/40 text-xs">â€”</span>;
-                          const millions = (n / 1000).toLocaleString("es-AR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                          return <span className="text-xs text-foreground/70 font-mono">${millions}M</span>;
-                        })()}
-                      </td>
-                      {/* Q Ofertas */}
-                      <td className="px-3 py-3 whitespace-nowrap text-center">
-                        <span className="text-sm font-semibold text-primary">
-                          {o.q_ofertas || "0"}
-                        </span>
-                      </td>
-                      {/* Q Compras */}
-                      <td className="px-3 py-3 whitespace-nowrap text-center">
-                        <span className="text-sm font-semibold text-emerald-400">
-                          {o.q_compras || "0"}
-                        </span>
-                      </td>
-                      {/* Provincia */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span className="text-xs text-foreground/80">
-                          {o.provincia || <span className="text-muted-foreground/40">â€”</span>}
-                        </span>
-                      </td>
-                      {/* Partido */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span className="text-xs text-muted-foreground">
-                          {o.partido || <span className="opacity-40">â€”</span>}
-                        </span>
-                      </td>
-                      {/* Ãšltima Oferta */}
-                      <td className="px-3 py-3 whitespace-nowrap">
-                        <span className="text-xs text-muted-foreground font-medium">
-                          {o.ultima_oferta || <span className="opacity-40">â€”</span>}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* PaginaciÃ³n */}
-        {!isLoading && !error && sorted.length > 0 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-secondary/20">
-            <p className="text-xs text-muted-foreground">
-              PÃ¡gina {page} de {totalPages} Â· {sorted.length} filas
-            </p>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let p: number;
-                if (totalPages <= 5) {
-                  p = i + 1;
-                } else if (page <= 3) {
-                  p = i + 1;
-                } else if (page >= totalPages - 2) {
-                  p = totalPages - 4 + i;
-                } else {
-                  p = page - 2 + i;
-                }
-                return (
-                  <button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    className={cn(
-                      "flex items-center justify-center w-8 h-8 rounded-lg text-sm font-medium transition-all",
-                      p === page
-                        ? "bg-primary text-primary-foreground"
-                        : "border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    )}
-                  >
-                    {p}
+                  <button onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                    className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                    <ChevronRight className="w-4 h-4" />
                   </button>
-                );
-              })}
-
-              <button
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
+
+        {/* ==================== TAB: GESTIONADAS ==================== */}
+        {activeTab === "gestionadas" && (() => {
+          const q = searchG.toLowerCase();
+          const filtG = gestionadas.filter((g) =>
+            !q ||
+            g.sociedad?.toLowerCase().includes(q) ||
+            g.usuario?.toLowerCase().includes(q) ||
+            g.AC?.toLowerCase().includes(q) ||
+            g.provincia?.toLowerCase().includes(q) ||
+            g.partido?.toLowerCase().includes(q) ||
+            g.cuit?.includes(q)
+          );
+          const totalPagesG = Math.max(1, Math.ceil(filtG.length / PAGE_SIZE));
+          const paginatedG = filtG.slice((pageG - 1) * PAGE_SIZE, pageG * PAGE_SIZE);
+          return (
+            <>
+              {/* Empty */}
+              {filtG.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                  <CheckCircle2 className="w-10 h-10 mb-3 opacity-30" />
+                  <p className="font-medium">Sin sociedades gestionadas</p>
+                  <p className="text-sm mt-1">
+                    {searchG ? "Probá con otro término." : "Todavía no hay sociedades excluidas del listado."}
+                  </p>
+                </div>
+              )}
+
+              {/* Table */}
+              {filtG.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-secondary/20">
+                        {["Sociedad", "Usuario", "CUIT", "AC", "REP", "Motivo", "Provincia", "Partido", "Q Ofertas", "Última Oferta"].map((h) => (
+                          <th key={h} className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {paginatedG.map((g, idx) => (
+                        <tr
+                          key={idx}
+                          onClick={() => g.cuit && router.push(`/asignaciones/cliente/${g.cuit}`)}
+                          className={cn(
+                            "hover:bg-secondary/40 transition-colors group",
+                            g.cuit ? "cursor-pointer" : ""
+                          )}
+                        >
+                          {/* Sociedad */}
+                          <td className="px-3 py-3 min-w-[160px]">
+                            <span className="font-semibold text-foreground text-sm leading-snug group-hover:text-primary transition-colors">
+                              {g.sociedad || <span className="text-muted-foreground/40">-</span>}
+                            </span>
+                          </td>
+                          {/* Usuario */}
+                          <td className="px-3 py-3 min-w-[140px]">
+                            <span className="text-xs text-muted-foreground">
+                              {g.usuario || <span className="opacity-40">-</span>}
+                            </span>
+                          </td>
+                          {/* CUIT */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs font-mono text-muted-foreground">{g.cuit || "-"}</span>
+                          </td>
+                          {/* AC */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {!g.AC || g.AC.trim() === "" || g.AC.trim().toUpperCase() === "SIN ASIGNAR" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 uppercase tracking-wider">
+                                Sin Asignar
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                <span className="text-xs text-foreground">{g.AC}</span>
+                              </span>
+                            )}
+                          </td>
+                          {/* REP */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-foreground/80">{g.REP || <span className="text-muted-foreground/40">-</span>}</span>
+                          </td>
+                          {/* Motivo */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            {g.motivo_gestion === "Manual" ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 uppercase tracking-wider">
+                                Manual
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase tracking-wider">
+                                CRM
+                              </span>
+                            )}
+                          </td>
+                          {/* Provincia */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-foreground/80">{g.provincia || <span className="text-muted-foreground/40">-</span>}</span>
+                          </td>
+                          {/* Partido */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-muted-foreground">{g.partido || <span className="opacity-40">-</span>}</span>
+                          </td>
+                          {/* Q Ofertas */}
+                          <td className="px-3 py-3 whitespace-nowrap text-center">
+                            <span className="text-sm font-semibold text-primary">{g.q_ofertas || "0"}</span>
+                          </td>
+                          {/* Última Oferta */}
+                          <td className="px-3 py-3 whitespace-nowrap">
+                            <span className="text-xs text-muted-foreground font-medium">{g.ultima_oferta || <span className="opacity-40">-</span>}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Paginación gestionadas */}
+              {filtG.length > PAGE_SIZE && (
+                <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-secondary/20">
+                  <p className="text-xs text-muted-foreground">
+                    Página {pageG} de {totalPagesG} · {filtG.length} filas
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setPageG((p) => Math.max(1, p - 1))}
+                      disabled={pageG === 1}
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    {Array.from({ length: Math.min(5, totalPagesG) }, (_, i) => {
+                      let p = i + 1;
+                      if (totalPagesG > 5) {
+                        if (pageG <= 3) p = i + 1;
+                        else if (pageG >= totalPagesG - 2) p = totalPagesG - 4 + i;
+                        else p = pageG - 2 + i;
+                      }
+                      return (
+                        <button
+                          key={p}
+                          onClick={() => setPageG(p)}
+                          className={cn(
+                            "flex items-center justify-center w-8 h-8 rounded-lg text-sm font-medium transition-all",
+                            p === pageG
+                              ? "bg-emerald-600 text-white"
+                              : "border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary"
+                          )}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setPageG((p) => Math.min(totalPagesG, p + 1))}
+                      disabled={pageG === totalPagesG}
+                      className="flex items-center justify-center w-8 h-8 rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Modal */}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -50,21 +50,21 @@ function CrearLeadPageContent() {
   const [searchMode, setSearchMode] = useState<"cuit" | "razon_social" | "nombre_apellido">("cuit");
   const [query, setQuery] = useState("");
 
-  // Guarda el email del AC que llegÃ³ por URL (se aplica cuando acsOptions cargue)
+  // Guarda el email del AC que llegó por URL (se aplica cuando acsOptions cargue)
   const [pendingAcEmail, setPendingAcEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/acs")
+    fetch("/api/asignaciones/acs")
       .then(res => res.json())
       .then(d => setAcsOptions(d.acs || []))
       .catch(e => console.error("Error cargando analistas", e));
 
-    fetch("/api/fuentes")
+    fetch("/api/asignaciones/fuentes")
       .then(res => res.json())
       .then(d => setFuentesOptions(d.fuentes || []))
       .catch(e => console.error("Error cargando fuentes", e));
 
-    fetch("/api/tipos-tarea")
+    fetch("/api/asignaciones/tipos-tarea")
       .then(res => res.json())
       .then(d => setTiposOptions(d.tipos || []))
       .catch(e => console.error("Error cargando tipos de tarea", e));
@@ -132,7 +132,7 @@ function CrearLeadPageContent() {
   const [copiedTarea, setCopiedTarea] = useState(false);
   const [isCopyingTarea, setIsCopyingTarea] = useState(false);
 
-  // Selector mÃºltiple
+  // Selector múltiple
   const [searchResultsOptions, setSearchResultsOptions] = useState<any[]>([]);
   const [showModal, setShowModal] = useState(false);
 
@@ -157,11 +157,11 @@ function CrearLeadPageContent() {
     try {
       setStatus("searching");
       
-      // FunciÃ³n helper para preview
+      // Función helper para preview
       const getPreview = async (email: string) => {
         try {
           const prefix = acCodigo || email.substring(0, 2).toUpperCase();
-          const resLead = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`).catch(() => null);
+          const resLead = await fetch(`/api/asignaciones/leads/last-id?prefix=${prefix}&sheet=leads`).catch(() => null);
           
           let maxLead = 0;
           if (resLead && resLead.ok) maxLead = (await resLead.json()).maxNumber;
@@ -179,7 +179,7 @@ function CrearLeadPageContent() {
         }
       };
 
-      const res = await fetch("/api/leads/lookup", {
+      const res = await fetch("/api/asignaciones/leads/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acEmail, searchType: searchMode, query: searchMode === "cuit" ? queryNorm : query })
@@ -194,7 +194,7 @@ function CrearLeadPageContent() {
       const resData = await res.json();
       setSource(resData.source);
       
-      // Armar la estructura del estado segÃºn el resultado
+      // Armar la estructura del estado según el resultado
       const baseData: LeadData = {
         acEmail,
         cuit: searchMode === "cuit" ? queryNorm : "",
@@ -213,11 +213,11 @@ function CrearLeadPageContent() {
 
 
       if (resData.source === "crm" && searchMode === "cuit" && resData.data) {
-        // Mapear un solo CRM. TambiÃ©n generar tarea_id para associated task.
+        // Mapear un solo CRM. También generar tarea_id para associated task.
         const dt = resData.data;
         const crmAC = dt["ac asignado"] || dt["ac_asignado"] || dt["email ac"] || baseData.acEmail;
         const crmLeadId = dt["#"] || dt["leadid"] || dt["lead id"] || dt["id"] || dt["numero"] || "";
-        const crmFecha = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignaciÃ³n"] || dt["fecha de asignacion"] || "";
+        const crmFecha = dt["fecha"] || dt["fecha asignacion"] || dt["fecha de asignación"] || dt["fecha de asignacion"] || "";
         
         // Generar tarea_id independiente para la tarea nueva asociada a este lead CRM
         const tareaPreview = await getPreview(acEmail);
@@ -233,9 +233,9 @@ function CrearLeadPageContent() {
           id_usuario: dt["id cliente"] || dt["id_usuario"] || "",
           provincia: dt["provincia usuario"] || dt["provincia"] || "",
           partido: dt["partido usuario"] || dt["partido"] || "",
-          telefono: dt["telÃ©fono"] || dt["telefono"] || "",
+          telefono: dt["teléfono"] || dt["telefono"] || "",
           email: dt["email"] || "",
-          razon_social: dt["razÃ³n social"] || dt["razon_social"] || "",
+          razon_social: dt["razón social"] || dt["razon_social"] || "",
           fuente: dt["fuente"] || "",
           source: "crm",
         });
@@ -270,10 +270,10 @@ function CrearLeadPageContent() {
             id_usuario: dt.id_usuario || dt["id cliente"] || "",
             provincia: dt.provincia || dt["provincia usuario"] || "",
             partido: dt.partido || dt["partido usuario"] || "",
-            telefono: dt.telefono || dt["telÃ©fono"] || "",
+            telefono: dt.telefono || dt["teléfono"] || "",
             email: dt.email || "",
             cuit: dt.cuit || dt["cuit"] || baseData.cuit,
-            razon_social: dt.razon_social || dt["razÃ³n social"] || "",
+            razon_social: dt.razon_social || dt["razón social"] || "",
             ofrecio: dt.ofrecio || "0",
             oferto: dt.oferto || "0",
             tarea_texto: dt.tarea_texto || computeTareaText(dt),
@@ -325,10 +325,10 @@ function CrearLeadPageContent() {
       id_usuario: dt.id_usuario || dt["id cliente"] || "",
       provincia: dt.provincia || dt["provincia usuario"] || "",
       partido: dt.partido || dt["partido usuario"] || "",
-      telefono: dt.telefono || dt["telÃ©fono"] || "",
+      telefono: dt.telefono || dt["teléfono"] || "",
       email: dt.email || "",
       cuit: dt.cuit || dt["cuit"] || data.cuit,
-      razon_social: dt.razon_social || dt["razÃ³n social"] || "",
+      razon_social: dt.razon_social || dt["razón social"] || "",
       ofrecio: dt.ofrecio || "0",
       oferto: dt.oferto || "0",
       tarea_texto: dt.tarea_texto || computeTareaText(dt),
@@ -354,8 +354,8 @@ function CrearLeadPageContent() {
       let finalFecha = data.fecha;
 
       if (source !== "crm") {
-        const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
-        if (!resId.ok) throw new Error("Error al obtener Ãºltimo ID de leads");
+        const resId = await fetch(`/api/asignaciones/leads/last-id?prefix=${prefix}&sheet=leads`);
+        if (!resId.ok) throw new Error("Error al obtener último ID de leads");
         const { maxNumber } = await resId.json();
         
         finalLeadID = `${prefix}${maxNumber + 1}`;
@@ -368,7 +368,7 @@ function CrearLeadPageContent() {
       }
 
       // A:LeadID, B:Fecha, C:AC, D:Fuente, E:Nombre, F:Apell, G:ID, H:Prov, I:Part, J:Tel, K:Email, L:CUIT, M:Razon
-      // N-V: 9 celdas vacÃ­as | W: Comentario | X-AD: 7 celdas vacÃ­as | AE: Creado Por
+      // N-V: 9 celdas vacías | W: Comentario | X-AD: 7 celdas vacías | AE: Creado Por
       const columns = [
         finalLeadID,
         finalFecha,
@@ -409,10 +409,10 @@ function CrearLeadPageContent() {
     if (!dt) return "";
     const io = Number(dt.ofrecio) || 0;
     const ia = Number(dt.oferto) || 0;
-    if (io === 1 && ia === 1) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente ofrecio y oferto tropas. Llamalo y dejÃ¡ un comentario";
-    if (io === 1 && ia === 0) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente ofrecio una tropa. Llamalo y dejÃ¡ un comentario";
-    if (io === 0 && ia === 1) return "Â¡TenÃ©s una Nueva Sociedad asignada! Este cliente oferto por una tropa. Llamalo y dejÃ¡ un comentario";
-    return "Â¡TenÃ©s una Nueva Sociedad asignada! Llamalo y dejÃ¡ un comentario";
+    if (io === 1 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio y oferto tropas. Llamalo y dejá un comentario";
+    if (io === 1 && ia === 0) return "¡Tenés una Nueva Sociedad asignada! Este cliente ofrecio una tropa. Llamalo y dejá un comentario";
+    if (io === 0 && ia === 1) return "¡Tenés una Nueva Sociedad asignada! Este cliente oferto por una tropa. Llamalo y dejá un comentario";
+    return "¡Tenés una Nueva Sociedad asignada! Llamalo y dejá un comentario";
   };
   
   const getFullNombreLead = () => {
@@ -434,10 +434,10 @@ function CrearLeadPageContent() {
       const prefix = acCodigo || acEmail.substring(0, 2).toUpperCase();
       let finalTareaID = data.tarea_id || "";
       
-      // Si aÃºn no hay tarea_id generado, obtenerlo ahora
+      // Si aún no hay tarea_id generado, obtenerlo ahora
       if (!finalTareaID || finalTareaID === "A calcular...") {
-        const resId = await fetch(`/api/leads/last-id?prefix=${prefix}&sheet=leads`);
-        if (!resId.ok) throw new Error("Error al obtener Ãºltimo ID de tareas");
+        const resId = await fetch(`/api/asignaciones/leads/last-id?prefix=${prefix}&sheet=leads`);
+        if (!resId.ok) throw new Error("Error al obtener último ID de tareas");
         const { maxNumber } = await resId.json();
         finalTareaID = `${prefix}${maxNumber + 1}`;
       }
@@ -449,7 +449,7 @@ function CrearLeadPageContent() {
       const finalFecha = `${mm}/${dd}/${yyyy}`;
 
       // A:ID Tarea, B:ID Lead, C:Titulo, D:AC, E:Tarea texto, F:Fecha, G:Estado
-      // H: vaciÃ³ | I: Creado Por | J-K: vacÃ­os | L: Tipo
+      // H: vació | I: Creado Por | J-K: vacíos | L: Tipo
       const finalTitulo = data.titulo_tarea ?? getFullNombreLead();
       const finalFechaTarea = data.fecha_tarea ?? finalFecha;
       const finalEstado = data.estado_tarea ?? "Pendiente";
@@ -461,9 +461,9 @@ function CrearLeadPageContent() {
         data.tarea_texto || "",
         finalFechaTarea,
         finalEstado,
-        "",                          // H (vacÃ­o)
+        "",                          // H (vacío)
         data.creado_por_tarea || "", // I: Creado Por
-        "", "",                      // J-K (vacÃ­os)
+        "", "",                      // J-K (vacíos)
         data.tipo_tarea || ""        // L: Tipo
       ];
 
@@ -484,7 +484,7 @@ function CrearLeadPageContent() {
 
   const fieldsConfig = [
     { label: "1. Lead ID", key: "lead_id", value: data?.lead_id || "A calcular...", readonly: false },
-    { label: "2. Fecha AsignaciÃ³n", key: "fecha", value: data?.fecha || "A calcular...", readonly: false },
+    { label: "2. Fecha Asignación", key: "fecha", value: data?.fecha || "A calcular...", readonly: false },
     { label: "3. AC asignado", key: "acEmail", type: "text", readonly: false },
     { label: "4. Fuente", key: "fuente", type: "text", readonly: false },
     { label: "5. Nombre", key: "nombre", type: "text", readonly: false },
@@ -492,10 +492,10 @@ function CrearLeadPageContent() {
     { label: "7. ID Cliente", key: "id_usuario", type: "text", readonly: false },
     { label: "8. Provincia", key: "provincia", type: "text", readonly: false },
     { label: "9. Partido", key: "partido", type: "text", readonly: false },
-    { label: "10. TelÃ©fono", key: "telefono", type: "text", readonly: false },
+    { label: "10. Teléfono", key: "telefono", type: "text", readonly: false },
     { label: "11. Email", key: "email", type: "text", readonly: false },
     { label: "12. CUIT", key: "cuit", type: "text", readonly: false },
-    { label: "13. RazÃ³n Social", key: "razon_social", type: "text", readonly: false },
+    { label: "13. Razón Social", key: "razon_social", type: "text", readonly: false },
     { label: "Comentario (col. W)", key: "comentario", type: "text", readonly: false },
     { label: "Creado Por (col. AE)", key: "creado_por", type: "select", readonly: false },
   ];
@@ -511,7 +511,7 @@ function CrearLeadPageContent() {
   const tareaFieldsConfig = [
     { label: "1. ID Tarea", key: "tarea_id", value: data?.tarea_id || "A calcular...", readonly: false },
     { label: "2. ID Lead", key: "lead_id", value: data?.lead_id || "-", readonly: false },
-    { label: "3. TÃ­tulo Lead", key: "titulo_tarea", value: data?.titulo_tarea ?? getFullNombreLead(), readonly: false },
+    { label: "3. Título Lead", key: "titulo_tarea", value: data?.titulo_tarea ?? getFullNombreLead(), readonly: false },
     { label: "4. AC Asignado", key: "acEmail", value: data?.acEmail || "-", readonly: false },
     { label: "5. Tarea", key: "tarea_texto", value: data?.tarea_texto || "", type: "text", readonly: false },
     { label: "6. Fecha Tarea", key: "fecha_tarea", value: data?.fecha_tarea ?? todayFormatted, readonly: false },
@@ -531,11 +531,11 @@ function CrearLeadPageContent() {
           Crear Lead
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          BÃºsqueda para identificar datos demogrÃ¡ficos de clientes e inicializar seguimiento.
+          Búsqueda para identificar datos demográficos de clientes e inicializar seguimiento.
         </p>
       </div>
 
-      {/* Formulario de BÃºsqueda */}
+      {/* Formulario de Búsqueda */}
       <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
         
         {/* Toggle Mode */}
@@ -552,7 +552,7 @@ function CrearLeadPageContent() {
             className={cn("px-4 py-1.5 text-sm font-medium rounded-md transition-all", searchMode === "razon_social" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
             onClick={() => { setSearchMode("razon_social"); setQuery(""); }}
           >
-            Buscar por RazÃ³n Social
+            Buscar por Razón Social
           </button>
           <button 
             type="button"
@@ -625,7 +625,7 @@ function CrearLeadPageContent() {
           
           <div className="flex-1 space-y-2 w-full">
             <label className="text-sm font-semibold text-foreground">
-              {searchMode === "cuit" ? "CUIT Sociedad" : searchMode === "razon_social" ? "RazÃ³n Social" : "Nombre o Apellido"}
+              {searchMode === "cuit" ? "CUIT Sociedad" : searchMode === "razon_social" ? "Razón Social" : "Nombre o Apellido"}
             </label>
             <input
               type="text"
@@ -663,15 +663,15 @@ function CrearLeadPageContent() {
           </p>
           {searchMode === "cuit" ? (
             <p className={cn("flex items-center gap-1", query && !isValidCuit && "text-rose-400 font-medium")}>
-              CUIT: {isValidCuit ? "11 dÃ­gitos OK" : `${queryNorm.length}/11 dÃ­gitos`}
+              CUIT: {isValidCuit ? "11 dígitos OK" : `${queryNorm.length}/11 dígitos`}
             </p>
           ) : searchMode === "razon_social" ? (
             <p className={cn("flex items-center gap-1", query && !isValidRs && "text-rose-400 font-medium")}>
-              RazÃ³n Social: {isValidRs ? "OK" : "MÃ­n. 3 caracteres"}
+              Razón Social: {isValidRs ? "OK" : "Mín. 3 caracteres"}
             </p>
           ) : (
             <p className={cn("flex items-center gap-1", query && !isValidNombreApellido && "text-rose-400 font-medium")}>
-              Nombre/Apellido: {isValidNombreApellido ? "OK" : "MÃ­n. 3 caracteres"}
+              Nombre/Apellido: {isValidNombreApellido ? "OK" : "Mín. 3 caracteres"}
             </p>
           )}
           {searchMode === "nombre_apellido" && (
@@ -741,7 +741,7 @@ function CrearLeadPageContent() {
                 )}
               >
                 {isCopyingLead ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedLead ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {isCopyingLead ? "Procesando..." : copiedLead ? "Â¡Fila copiada!" : "Copiar fila (TSV)"}
+                {isCopyingLead ? "Procesando..." : copiedLead ? "¡Fila copiada!" : "Copiar fila (TSV)"}
               </button>
             </div>
 
@@ -749,7 +749,7 @@ function CrearLeadPageContent() {
               <div className="mx-5 mt-4 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-500 text-sm flex items-center gap-2">
                 <Info className="w-5 h-5 shrink-0" />
                 <p>
-                  Esta sociedad ya estÃ¡ generada en el CRM y estÃ¡ asignada a <strong className="font-bold">{data.acEmail}</strong>.
+                  Esta sociedad ya está generada en el CRM y está asignada a <strong className="font-bold">{data.acEmail}</strong>.
                 </p>
               </div>
             )}
@@ -855,7 +855,7 @@ function CrearLeadPageContent() {
                 </h2>
                 <p className="text-xs text-muted-foreground mt-1">
                   {source === "crm"
-                    ? "El lead ya existe en el CRM. PodÃ©s crear y copiar una nueva tarea asociada a Ã©l."
+                    ? "El lead ya existe en el CRM. Podés crear y copiar una nueva tarea asociada a él."
                     : "Copia esta fila en la hoja de \"Tareas\" para documentar el inicio del ciclo comercial."}
                 </p>
               </div>
@@ -871,7 +871,7 @@ function CrearLeadPageContent() {
                 )}
               >
                 {isCopyingTarea ? <Loader2 className="w-4 h-4 animate-spin" /> : copiedTarea ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {isCopyingTarea ? "Procesando..." : copiedTarea ? "Â¡Fila copiada!" : "Copiar fila (TSV)"}
+                {isCopyingTarea ? "Procesando..." : copiedTarea ? "¡Fila copiada!" : "Copiar fila (TSV)"}
               </button>
             </div>
 
@@ -940,7 +940,7 @@ function CrearLeadPageContent() {
                               ))}
                             {tiposOptions.length > 0 &&
                               tiposOptions.filter(t => t.toLowerCase().includes(String(field.value || "").toLowerCase())).length === 0 && (
-                              <li className="px-3 py-3 text-sm text-center text-muted-foreground">No coincidencias â€” se guardarÃ¡ el texto ingresado</li>
+                              <li className="px-3 py-3 text-sm text-center text-muted-foreground">No coincidencias - se guardará el texto ingresado</li>
                             )}
                             {tiposOptions.length === 0 && (
                               <li className="px-3 py-4 text-sm text-center text-muted-foreground flex justify-center items-center gap-2">
@@ -968,14 +968,14 @@ function CrearLeadPageContent() {
         </div>
       )}
 
-      {/* Modal MÃºltiples Resultados */}
+      {/* Modal Múltiples Resultados */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm animate-fade-in">
           <div className="w-full max-w-lg bg-card border border-border rounded-xl shadow-lg flex flex-col overflow-hidden max-h-[80vh]">
             <div className="p-5 border-b border-border bg-secondary/30">
-              <h3 className="font-semibold text-lg text-foreground">MÃºltiples resultados encontrados</h3>
+              <h3 className="font-semibold text-lg text-foreground">Múltiples resultados encontrados</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                La bÃºsqueda encontrÃ³ mÃ¡s de un contacto asociado. Selecciona cuÃ¡l cargar:
+                La búsqueda encontró más de un contacto asociado. Selecciona cuál cargar:
               </p>
             </div>
             <div className="overflow-y-auto p-2">
@@ -1028,7 +1028,7 @@ function CrearLeadPageContent() {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 text-sm font-medium text-foreground bg-background border border-border rounded-lg hover:bg-secondary transition-all"
               >
-                Cerrar y cargar vacÃ­o
+                Cerrar y cargar vacío
               </button>
             </div>
           </div>

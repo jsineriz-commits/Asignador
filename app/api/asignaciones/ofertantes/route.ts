@@ -1,30 +1,9 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
+import { fetchSheetRange } from "@/lib/sheets-fetch";
 
 const OFERTANTES_SHEET_ID = "1gP6cckD44ZS5CjZPsYYqGYU0rnQqztYFFFEm22nQU_4";
 
-// â”€â”€â”€ Helper: fetch a Sheets range and return rows (string[][]) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-async function fetchSheetRange(
-  token: string,
-  sheetId: string,
-  range: string
-): Promise<string[][]> {
-  const encodedRange = range.replace(/ /g, "%20");
-  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodedRange}`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Sheets API error [${range}]: ${res.statusText} â€” ${body}`);
-  }
-  const json = await res.json();
-  return (json.values as string[][]) || [];
-}
-
-// â”€â”€â”€ Helper: find column index by header substring (case-insensitive) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function colIdx(headers: string[], ...candidates: string[]): number {
   const lower = headers.map((h) => h.trim().toLowerCase());
   for (const c of candidates) {
@@ -33,6 +12,50 @@ function colIdx(headers: string[], ...candidates: string[]): number {
   }
   return -1;
 }
+
+/** Normaliza para comparar: minúsculas + sin acentos + sin espacios dobles */
+function norm(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+/** Aliases de provincia: normaliza variantes al nombre canónico (sin acentos) */
+function provinciaAlias(p: string): string {
+  const n = norm(p);
+  if (
+    n.includes("c.a.") ||
+    n.includes("ciudad autonoma") ||
+    n.includes("capital federal") ||
+    n === "caba"
+  ) return "buenos aires";
+  return n;
+}
+
+// -- Fallback por provincia cuando el partido no tiene match exacto en la tabla -
+const PROVINCIA_FALLBACK: Record<string, string> = {
+  "buenos aires":        "Paulina Taffarel / Juan Siñeriz",
+  "la pampa":            "Juan Siñeriz",
+  "santa fe":            "Juan Siñeriz / Juan Segundo Tonon",
+  "entre rios":          "Juan Segundo Tonon",
+  "corrientes":          "Juan Segundo Tonon",
+  "misiones":            "Juan Segundo Tonon",
+  "chaco":               "Juan Segundo Tonon",
+  "formosa":             "Santos Dewey",
+  "salta":               "Santos Dewey",
+  "jujuy":               "Santos Dewey",
+  "tucuman":             "Santos Dewey",
+  "catamarca":           "Santos Dewey",
+  "santiago del estero": "Santos Dewey",
+  "cordoba":             "Santos Dewey",
+  "la rioja":            "Santos Dewey",
+  "san juan":            "Santos Dewey",
+  "san luis":            "Santos Dewey",
+  "mendoza":             "Santos Dewey",
+};
 
 export async function GET() {
   try {
@@ -57,10 +80,15 @@ export async function GET() {
       "https://www.googleapis.com/auth/spreadsheets.readonly"
     );
 
-    // â”€â”€ Fetch ofertantes (obligatorio) + CRM sheets (opcional, fail-safe) â”€â”€â”€â”€â”€â”€â”€â”€
     const crmAvailable = !!GNS_CRM_SHEET_ID;
 
-    const [ofertantesResult, leadsResult, tareasResult, informadosResult] = await Promise.allSettled([
+    const [
+      ofertantesResult,
+      leadsResult,
+      tareasResult,
+      informadosResult,
+      respDptoResult,
+    ] = await Promise.allSettled([
       fetchSheetRange(token, OFERTANTES_SHEET_ID, "ofertantes!A:Z"),
       crmAvailable
         ? fetchSheetRange(token, GNS_CRM_SHEET_ID!, "Leads!A:Z")
@@ -68,123 +96,139 @@ export async function GET() {
       crmAvailable
         ? fetchSheetRange(token, GNS_CRM_SHEET_ID!, "Tareas!A:Z")
         : Promise.resolve([] as string[][]),
-      // Hoja "informados" en el mismo sheet de ofertantes (col A = CUIT)
       fetchSheetRange(token, OFERTANTES_SHEET_ID, "informados!A:A"),
+      // responsables_dpto: col A = provincia, col B = partido, col E = responsable
+      fetchSheetRange(token, OFERTANTES_SHEET_ID, "responsables_dpto!A:E"),
     ]);
 
-    // Si el sheet de ofertantes fallÃ³, sÃ­ retornamos error
-    if (ofertantesResult.status === "rejected") {
-      throw ofertantesResult.reason;
-    }
+    if (ofertantesResult.status === "rejected") throw ofertantesResult.reason;
 
     const ofertantesRows = ofertantesResult.value;
+    const leadsRows: string[][] = leadsResult.status === "fulfilled" ? leadsResult.value : [];
+    const tareasRows: string[][] = tareasResult.status === "fulfilled" ? tareasResult.value : [];
+    const informadosRows: string[][] = informadosResult.status === "fulfilled" ? informadosResult.value : [];
+    const respDptoRows: string[][] = respDptoResult.status === "fulfilled" ? respDptoResult.value : [];
 
-    // CRM: si falla por permisos u otro motivo, logueamos pero no bloqueamos
-    const leadsRows: string[][] =
-      leadsResult.status === "fulfilled" ? leadsResult.value : [];
-    const tareasRows: string[][] =
-      tareasResult.status === "fulfilled" ? tareasResult.value : [];
-    const informadosRows: string[][] =
-      informadosResult.status === "fulfilled" ? informadosResult.value : [];
+    if (leadsResult.status === "rejected")
+      console.warn("[OFERTANTES_API] Leads CRM no disponible:", leadsResult.reason?.message);
+    if (tareasResult.status === "rejected")
+      console.warn("[OFERTANTES_API] Tareas CRM no disponible:", tareasResult.reason?.message);
+    if (informadosResult.status === "rejected")
+      console.warn("[OFERTANTES_API] Informados no disponible:", informadosResult.reason?.message);
+    if (respDptoResult.status === "rejected")
+      console.warn("[OFERTANTES_API] responsables_dpto no disponible:", respDptoResult.reason?.message);
 
-    if (leadsResult.status === "rejected") {
-      console.warn("[OFERTANTES_API] No se pudo acceder a Leads del CRM (filtrado desactivado):", leadsResult.reason?.message);
-    }
-    if (tareasResult.status === "rejected") {
-      console.warn("[OFERTANTES_API] No se pudo acceder a Tareas del CRM (filtrado desactivado):", tareasResult.reason?.message);
-    }
-    if (informadosResult.status === "rejected") {
-      console.warn("[OFERTANTES_API] No se pudo acceder a Informados (filtrado desactivado):", informadosResult.reason?.message);
-    }
-
-    // â”€â”€ Parse ofertantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Parse ofertantes -------------------------------------------------------
     if (ofertantesRows.length === 0) {
-      return NextResponse.json({ ofertantes: [] });
+      return NextResponse.json({ ofertantes: [], gestionadas: [] });
     }
 
     const ofHeaders = ofertantesRows[0];
-    const ofRows = ofertantesRows.slice(1);
-
-    const ofertantes = ofRows
+    const ofertantes = ofertantesRows
+      .slice(1)
       .map((row) => {
         const obj: Record<string, string> = {};
-        ofHeaders.forEach((header, i) => {
-          obj[header] = row[i] ?? "";
-        });
+        ofHeaders.forEach((h, i) => { obj[h] = row[i] ?? ""; });
         return obj;
       })
       .filter((row) => Object.values(row).some((v) => v.trim() !== ""));
 
-    // â”€â”€ Build CRM lookup: CUIT â†’ LeadID â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- CRM lookup: CUIT -> LeadID ---------------------------------------------
     const cuitToLeadId = new Map<string, string>();
-
     if (leadsRows.length > 1) {
-      const leadsHeaders = leadsRows[0];
-      const cuitColIdx = colIdx(leadsHeaders, "cuit sociedad", "cuit");
-      const leadIdColIdx = colIdx(leadsHeaders, "leadid", "lead id", "lead_id", "#", "id");
-
-      if (cuitColIdx !== -1 && leadIdColIdx !== -1) {
+      const lh = leadsRows[0];
+      const cuitCol = colIdx(lh, "cuit sociedad", "cuit");
+      const idCol = colIdx(lh, "leadid", "lead id", "lead_id", "#", "id");
+      if (cuitCol !== -1 && idCol !== -1) {
         for (let i = 1; i < leadsRows.length; i++) {
-          const row = leadsRows[i];
-          const rawCuit = String(row[cuitColIdx] ?? "").replace(/\D/g, "");
-          const leadId = String(row[leadIdColIdx] ?? "").trim();
-          if (rawCuit && leadId) {
-            cuitToLeadId.set(rawCuit, leadId);
-          }
+          const rawCuit = String(leadsRows[i][cuitCol] ?? "").replace(/\D/g, "");
+          const leadId = String(leadsRows[i][idCol] ?? "").trim();
+          if (rawCuit && leadId) cuitToLeadId.set(rawCuit, leadId);
         }
       }
     }
 
-    // â”€â”€ Build EXCLUSION set: LeadIDs con Tipo = "GNS - OFERTANTES" en Tareas â”€â”€â”€â”€â”€â”€
+    // -- Exclusion set: LeadIDs con tarea "GNS - OFERTANTES" -------------------
     const excludedLeadIds = new Set<string>();
-
     if (tareasRows.length > 1) {
-      const tareasHeaders = tareasRows[0];
-      // Buscar "Tipo" (col 11 en el schema real)
-      const tipoColIdx = colIdx(tareasHeaders, "tipo");
-      // Buscar "ID Lead" antes que "id" genÃ©rico para no matchear "ID Tarea"
-      const tareaLeadIdColIdx = colIdx(tareasHeaders, "id lead", "lead id", "leadid", "lead_id");
-
-      if (tipoColIdx !== -1 && tareaLeadIdColIdx !== -1) {
+      const th = tareasRows[0];
+      const tipoCol = colIdx(th, "tipo");
+      const leadIdCol = colIdx(th, "id lead", "lead id", "leadid", "lead_id");
+      if (tipoCol !== -1 && leadIdCol !== -1) {
         for (let i = 1; i < tareasRows.length; i++) {
-          const row = tareasRows[i];
-          const tipo = String(row[tipoColIdx] ?? "").trim().toLowerCase();
-          const leadId = String(row[tareaLeadIdColIdx] ?? "").trim();
-          if (tipo === "gns - ofertantes" && leadId) {
-            excludedLeadIds.add(leadId);
-          }
+          const tipo = String(tareasRows[i][tipoCol] ?? "").trim().toLowerCase();
+          const leadId = String(tareasRows[i][leadIdCol] ?? "").trim();
+          if (tipo === "gns - ofertantes" && leadId) excludedLeadIds.add(leadId);
         }
       }
     }
 
-    // â”€â”€ Build EXCLUSION set por CUIT: hoja "informados" (col A) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // -- Exclusion set: CUITs en hoja "informados" (gestion manual) -------------
     const informadosCuits = new Set<string>();
-
-    // La hoja puede o no tener cabecera; tomamos todas las filas (salvo la primera
-    // si tiene cabecera tipo "cuit", o desde la fila 1 si contiene solo datos)
-    const informadosData = informadosRows.length > 0
-      ? (informadosRows[0]?.[0]?.toLowerCase().includes("cuit") ? informadosRows.slice(1) : informadosRows)
-      : [];
-
+    const informadosData =
+      informadosRows.length > 0 && informadosRows[0]?.[0]?.toLowerCase().includes("cuit")
+        ? informadosRows.slice(1)
+        : informadosRows;
     for (const row of informadosData) {
       const rawCuit = String(row[0] ?? "").replace(/\D/g, "");
       if (rawCuit) informadosCuits.add(rawCuit);
     }
 
-    // â”€â”€ Filter ofertantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // Excluir ofertantes cuyo CUIT tenga un Lead con tarea "GNS Ofertante"
-    const filtered = ofertantes.filter((of) => {
-      const rawCuit = String(of.cuit ?? "").replace(/\D/g, "");
-      if (!rawCuit) return true;           // sin CUIT â†’ incluir
-      // Excluir si estÃ¡ en "informados"
-      if (informadosCuits.has(rawCuit)) return false;
-      // Excluir si tiene Lead con tarea "GNS Ofertante" en CRM
-      const leadId = cuitToLeadId.get(rawCuit);
-      if (!leadId) return true;
-      return !excludedLeadIds.has(leadId);
-    });
+    // -- Direct join: (provincia + partido) -> responsable ----------------------
+    // responsables_dpto: col A = provincia, col B = partido, col E = responsable
+    // Clave compuesta normalizada
+    const dptoKey = (provincia: string, partido: string) =>
+      `${provinciaAlias(provincia)}|${norm(partido)}`;
 
-    return NextResponse.json({ ofertantes: filtered });
+    const dptoToResponsable = new Map<string, string>();
+    for (const row of respDptoRows) {
+      const provincia   = String(row[0] ?? "").trim();
+      const partido     = String(row[1] ?? "").trim();
+      const responsable = String(row[4] ?? "").trim();
+      if (provincia && partido && responsable) {
+        dptoToResponsable.set(dptoKey(provincia, partido), responsable);
+      }
+    }
+
+    /**
+     * Resolución de responsable:
+     * 1) Match exacto (provincia + partido) en responsables_dpto
+     * 2) Fallback al responsable por defecto de la provincia
+     * 3) Sin match → string vacío
+     */
+    const resolveResponsable = (provincia: string, partido: string): string => {
+      const exact = dptoToResponsable.get(dptoKey(provincia, partido));
+      if (exact) return exact;
+      const provNorm = provinciaAlias(provincia);
+      return PROVINCIA_FALLBACK[provNorm] ?? "";
+    };
+
+    // -- Classify each ofertante ------------------------------------------------
+    const filtered: Record<string, string>[] = [];
+    const gestionadas: Record<string, string>[] = [];
+
+    for (const of_ of ofertantes) {
+      const rawCuit = String(of_.cuit ?? "").replace(/\D/g, "");
+      const responsable = resolveResponsable(of_.provincia ?? "", of_.partido ?? "");
+      const enriched = { ...of_, responsable };
+
+      if (!rawCuit) { filtered.push(enriched); continue; }
+
+      if (informadosCuits.has(rawCuit)) {
+        gestionadas.push({ ...enriched, motivo_gestion: "Manual" });
+        continue;
+      }
+
+      const leadId = cuitToLeadId.get(rawCuit);
+      if (leadId && excludedLeadIds.has(leadId)) {
+        gestionadas.push({ ...enriched, motivo_gestion: "CRM" });
+        continue;
+      }
+
+      filtered.push(enriched);
+    }
+
+    return NextResponse.json({ ofertantes: filtered, gestionadas });
   } catch (error: any) {
     console.error("[OFERTANTES_API_ERROR]", error);
     return NextResponse.json(
@@ -193,4 +237,3 @@ export async function GET() {
     );
   }
 }
-

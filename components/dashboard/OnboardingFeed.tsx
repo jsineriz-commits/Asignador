@@ -68,7 +68,7 @@ export default function OnboardingFeed({ data }: OnboardingFeedProps) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <Link
-                    href={`/cliente/${item.cuit}`}
+                    href={`/asignaciones/cliente/${item.cuit}`}
                     className="text-sm font-medium text-foreground group-hover:text-primary transition-colors truncate"
                   >
                     {item.razon_social}
@@ -98,7 +98,7 @@ export default function OnboardingFeed({ data }: OnboardingFeedProps) {
 
               {/* Arrow */}
               <Link
-                href={`/cliente/${item.cuit}`}
+                href={`/asignaciones/cliente/${item.cuit}`}
                 className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-primary"
               >
                 <ArrowRight className="w-4 h-4" />

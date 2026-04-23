@@ -74,7 +74,7 @@ export default function EvolucionChart({ detail }: EvolucionChartProps) {
               }}
             />
             <span>
-              {h.tipo === "NUEVA" ? "Asignación" : "Reasignación"} — {h.AC} ({formatDate(h.fecha_asignacion)})
+              {h.tipo === "NUEVA" ? "Asignación" : "Reasignación"} - {h.AC} ({formatDate(h.fecha_asignacion)})
             </span>
           </div>
         ))}

@@ -1,5 +1,6 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
+import { fetchSheetRange } from "@/lib/sheets-fetch";
 
 const OFERTANTES_SHEET_ID = "1gP6cckD44ZS5CjZPsYYqGYU0rnQqztYFFFEm22nQU_4";
 
@@ -9,7 +10,7 @@ export async function GET(request: Request) {
     const cuit = searchParams.get("cuit");
 
     if (!cuit) {
-      return NextResponse.json({ error: "Falta parÃ¡metro cuit" }, { status: 400 });
+      return NextResponse.json({ error: "Falta parametro cuit" }, { status: 400 });
     }
 
     const { GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY } = process.env;
@@ -29,20 +30,7 @@ export async function GET(request: Request) {
       "https://www.googleapis.com/auth/spreadsheets.readonly"
     );
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${OFERTANTES_SHEET_ID}/values/import_gns!A:AI`;
-
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      cache: "no-store",
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`Error en Sheets API (import_gns): ${res.statusText} â€” ${body}`);
-    }
-
-    const json = await res.json();
-    const values: string[][] = json.values || [];
+    const values = await fetchSheetRange(token, OFERTANTES_SHEET_ID, "import_gns!A:AI");
 
     if (values.length === 0) {
       return NextResponse.json({ ofertas: [] });
@@ -75,4 +63,3 @@ export async function GET(request: Request) {
     );
   }
 }
-
