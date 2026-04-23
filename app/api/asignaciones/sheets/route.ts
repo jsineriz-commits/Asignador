@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
 export async function GET() {
   try {
     const {
-      GOOGLE_SHEETS_ID,
       GOOGLE_SERVICE_ACCOUNT_EMAIL,
       GOOGLE_PRIVATE_KEY,
     } = process.env;
 
-    if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
         { error: "Faltan credenciales de Google Sheets en .env.local" },
         { status: 500 }
@@ -27,7 +27,7 @@ export async function GET() {
     );
 
     // Fetch Leads
-    const leadsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/Leads!A:L`;
+    const leadsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values/Leads!A:L`;
     const leadsRes = await fetch(leadsUrl, {
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       cache: "no-store",
@@ -35,7 +35,7 @@ export async function GET() {
 
     if (!leadsRes.ok) {
       const body = await leadsRes.text();
-      throw new Error(`Error en Sheets API (Leads): ${leadsRes.statusText} - ${body}`);
+      throw new Error(`Error en Sheets API (Leads): ${leadsRes.statusText} â€” ${body}`);
     }
 
     const leadsJson = await leadsRes.json();
@@ -58,10 +58,10 @@ export async function GET() {
         });
     }
 
-    // Fetch Comentarios - si la pestaña no existe, devolvemos array vacío sin romper todo
+    // Fetch Comentarios â€” si la pestaÃ±a no existe, devolvemos array vacÃ­o sin romper todo
     let comentarios: any[] = [];
     try {
-      const comentariosUrl = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/Comentarios!A:G`;
+      const comentariosUrl = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values/Comentarios!A:G`;
       const comentariosRes = await fetch(comentariosUrl, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         cache: "no-store",
@@ -82,8 +82,8 @@ export async function GET() {
           });
         }
       } else {
-        // La pestaña "Comentarios" probablemente no existe aún - no es un error fatal
-        console.warn("[SHEETS_API] Pestaña Comentarios no encontrada, devolviendo vacío.");
+        // La pestaÃ±a "Comentarios" probablemente no existe aÃºn â€” no es un error fatal
+        console.warn("[SHEETS_API] PestaÃ±a Comentarios no encontrada, devolviendo vacÃ­o.");
       }
     } catch (comentariosErr) {
       console.warn("[SHEETS_API] Error al obtener Comentarios:", comentariosErr);
@@ -98,3 +98,4 @@ export async function GET() {
     );
   }
 }
+

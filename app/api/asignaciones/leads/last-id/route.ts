@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
 export async function GET(req: Request) {
@@ -9,16 +10,15 @@ export async function GET(req: Request) {
     const sheetName = sheetParam.toLowerCase() === "tareas" ? "Tareas" : "Leads";
 
     if (!prefix) {
-      return NextResponse.json({ error: "Falta el parámetro prefix" }, { status: 400 });
+      return NextResponse.json({ error: "Falta el parÃ¡metro prefix" }, { status: 400 });
     }
 
     const {
-      GOOGLE_SHEETS_ID,
       GOOGLE_SERVICE_ACCOUNT_EMAIL,
       GOOGLE_PRIVATE_KEY,
     } = process.env;
 
-    if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
         { error: "Faltan credenciales de Google Sheets" },
         { status: 500 }
@@ -31,7 +31,7 @@ export async function GET(req: Request) {
       privateKey,
       "https://www.googleapis.com/auth/spreadsheets.readonly"
     );
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/${sheetName}!A2:A`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values/${sheetName}!A2:A`;
 
     const sheetsRes = await fetch(url, {
       headers: {
@@ -67,8 +67,9 @@ export async function GET(req: Request) {
   } catch (error: any) {
     console.error("[LAST_ID_API_ERROR]", error);
     return NextResponse.json(
-      { error: "Error interno calculando el último ID", details: error.message },
+      { error: "Error interno calculando el Ãºltimo ID", details: error.message },
       { status: 500 }
     );
   }
 }
+

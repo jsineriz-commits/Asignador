@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
 export async function GET() {
   try {
     const {
-      GOOGLE_SHEETS_ID,
       GOOGLE_SERVICE_ACCOUNT_EMAIL,
       GOOGLE_PRIVATE_KEY,
     } = process.env;
 
-    if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
         { error: "Faltan credenciales de Google Sheets en .env.local" },
         { status: 500 }
@@ -27,7 +27,7 @@ export async function GET() {
     const params = new URLSearchParams([
       ["ranges", "Analistas x AC!A:E"]
     ]);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values:batchGet?${params.toString()}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values:batchGet?${params.toString()}`;
 
     const res = await fetch(url, {
       headers: {
@@ -51,7 +51,7 @@ export async function GET() {
       // Omitir cabecera
       const rows = acsValues.slice(1);
       
-      // Columna A (0) = email, Columna C (2) = Nombre, Columna E (4) = Código para IDs
+      // Columna A (0) = email, Columna C (2) = Nombre, Columna E (4) = CÃ³digo para IDs
       acs = rows.map((row: any[]) => ({
         email: row[0] || "",
         nombre: row[2] || "",
@@ -63,7 +63,7 @@ export async function GET() {
         ac.email.toLowerCase() !== "ptaffarel@decampoacampo.com"
       );
       
-      // Ordenar alfabéticamente por nombre
+      // Ordenar alfabÃ©ticamente por nombre
       acs.sort((a, b) => a.nombre.localeCompare(b.nombre));
     }
 
@@ -76,3 +76,4 @@ export async function GET() {
     );
   }
 }
+

@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
+import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
 export async function GET() {
   try {
     const {
-      GOOGLE_SHEETS_ID,
       GOOGLE_SERVICE_ACCOUNT_EMAIL,
       GOOGLE_PRIVATE_KEY,
     } = process.env;
 
-    if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
         { error: "Faltan credenciales de Google Sheets en .env.local" },
         { status: 500 }
@@ -27,7 +27,7 @@ export async function GET() {
     const params = new URLSearchParams([
       ["ranges", "Leads!D:D"]
     ]);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values:batchGet?${params.toString()}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values:batchGet?${params.toString()}`;
 
     const res = await fetch(url, {
       headers: {
@@ -70,3 +70,4 @@ export async function GET() {
     );
   }
 }
+

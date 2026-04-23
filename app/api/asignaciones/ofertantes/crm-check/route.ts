@@ -1,4 +1,5 @@
 ﻿import { NextResponse } from "next/server";
+import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
 export async function GET(req: Request) {
@@ -8,7 +9,7 @@ export async function GET(req: Request) {
 
     if (!cuit || cuit.length !== 11) {
       return NextResponse.json(
-        { error: "CUIT inválido o ausente" },
+        { error: "CUIT invÃ¡lido o ausente" },
         { status: 400 }
       );
     }
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
     const { GOOGLE_SHEETS_ID, GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY } =
       process.env;
 
-    if (!GOOGLE_SHEETS_ID || !GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
+    if (!GOOGLE_SERVICE_ACCOUNT_EMAIL || !GOOGLE_PRIVATE_KEY) {
       return NextResponse.json(
         { error: "Faltan credenciales de Google Sheets" },
         { status: 500 }
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
     );
 
     // Leemos solo las columnas A:M de Leads para obtener cabecera + CUIT (col L) + AC (col C)
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${GOOGLE_SHEETS_ID}/values/Leads!A1:M`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CRM_SHEET_ID}/values/Leads!A1:M`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
 
     if (!sheetsRes.ok) {
       const body = await sheetsRes.text();
-      throw new Error(`Sheets error: ${sheetsRes.status} - ${body}`);
+      throw new Error(`Sheets error: ${sheetsRes.status} â€” ${body}`);
     }
 
     const json = await sheetsRes.json();
@@ -58,14 +59,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ found: false });
     }
 
-    // Detectar índices de columnas dinamicamente por cabecera
+    // Detectar Ã­ndices de columnas dinamicamente por cabecera
     const headers = rows[0].map((h: string) => String(h).trim().toLowerCase());
     const cuitIdx = headers.findIndex((h) => h.includes("cuit"));
     const acIdx = headers.findIndex(
       (h) => h.includes("ac asignado") || h.includes("ac_asignado") || h.includes("email ac")
     );
     const leadIdIdx = headers.findIndex(
-      (h) => h === "#" || h === "leadid" || h === "lead id" || h === "id" || h === "número" || h === "numero"
+      (h) => h === "#" || h === "leadid" || h === "lead id" || h === "id" || h === "nÃºmero" || h === "numero"
     );
 
     if (cuitIdx === -1) {
