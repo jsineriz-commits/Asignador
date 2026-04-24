@@ -9,6 +9,7 @@ import {
   ChevronRight,
   FilePlus,
   Beef,
+  Store,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ const NAV_ITEMS = [
   { href: "/asignaciones", label: "Dashboard", icon: LayoutDashboard },
   { href: "/asignaciones/crear-lead", label: "Crear Lead", icon: FilePlus },
   { href: "/asignaciones/gns-ofertantes", label: "GNS Ofertantes", icon: Beef },
+  { href: "/asignaciones/gns-ofrecedoras", label: "GNS Ofrecedoras", icon: Store },
 ];
 
 
