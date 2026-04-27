@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { CRM_SHEET_ID, GNS_CRM_SHEET_ID, GNS_MIRROR_SHEET_ID } from "@/lib/sheets-config";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
@@ -184,7 +184,25 @@ export async function GET() {
       return !excludedLeadIds.has(leadId);
     });
 
-    return NextResponse.json({ ofertantes: filtered });
+    // ── Build gestionadas ─────────────────────────────────────────────────────
+    // Son las sociedades excluidas del listado, con motivo_gestion:
+    //   "Manual" → CUIT está en la hoja "informados"
+    //   "CRM"    → CUIT tiene un Lead con tarea "GNS - OFERTANTES" en el CRM
+    const gestionadas = ofertantes
+      .filter((of) => {
+        const rawCuit = String(of.cuit ?? "").replace(/\D/g, "");
+        if (!rawCuit) return false;
+        if (informadosCuits.has(rawCuit)) return true;
+        const leadId = cuitToLeadId.get(rawCuit);
+        return !!leadId && excludedLeadIds.has(leadId);
+      })
+      .map((of) => {
+        const rawCuit = String(of.cuit ?? "").replace(/\D/g, "");
+        const motivo_gestion = informadosCuits.has(rawCuit) ? "Manual" : "CRM";
+        return { ...of, motivo_gestion };
+      });
+
+    return NextResponse.json({ ofertantes: filtered, gestionadas });
   } catch (error: any) {
     console.error("[OFERTANTES_API_ERROR]", error);
     return NextResponse.json(
