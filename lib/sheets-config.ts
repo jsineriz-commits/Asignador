@@ -19,5 +19,4 @@ export const GNS_MIRROR_SHEET_ID = "1gP6cckD44ZS5CjZPsYYqGYU0rnQqztYFFFEm22nQU_4
 
 // ── Módulo Gestión de Sociedades ─────────────────────────────────────────────
 /** Sheet principal de Gestión: zonas, GADM, exportaciones */
-export const SOCIEDADES_SHEET_ID =
-  process.env.SOCIEDADES_SHEETS_ID || ""; // completar cuando esté disponible
+export const SOCIEDADES_SHEET_ID = "1KfqTwP2hdeqF_FZSmEEniP1tLvqve8t3p3ZgrUWnk4k";
