@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSheetData } from '../../../../lib/sociedades/sheets.js';
 
 export const dynamic = 'force-dynamic';
@@ -95,25 +95,34 @@ export async function GET() {
       const gadmProv   = String(row[0] || '').trim(); // col A: prov GADM (ej. "BuenosAires")
       const gadmDept   = String(row[1] || '').trim(); // col B: depto GADM (ej. "NuevedeJulio")
       const normDept   = String(row[3] || '').trim(); // col D: depto normalizado
-      const bcDept     = String(row[5] || '').trim(); // col F â†’ nombre en query Metabase
-      const bcProv     = String(row[6] || '').trim(); // col G â†’ provincia en query Metabase
-      const rosterDept = String(row[7] || '').trim(); // col H â†’ nombre en Roster-Regiones (NUEVO)
-      const rosterProv = String(row[8] || '').trim(); // col I â†’ provincia en Roster-Regiones (NUEVO)
+      const bcDept     = String(row[5] || '').trim(); // col F → nombre en query Metabase
+      const bcProv     = String(row[6] || '').trim(); // col G → provincia en query Metabase
+      const rosterDept = String(row[7] || '').trim(); // col H → nombre en Roster-Regiones
+      const rosterProv = String(row[8] || '').trim(); // col I → provincia en Roster-Regiones
 
-      // gadmRawToNorm: col B â†’ col D (para traducciÃ³n de nombres en getFeatureKey)
+      // gadmRawToNorm: col B → col D (para traducción de nombres en getFeatureKey)
       if (gadmDept && normDept && gadmDept !== normDept) {
         gadmRawToNorm[gadmDept] = normDept;
       }
-      // gadmToRoster: col B â†’ col H/I (para getZona busque en deptoMap con nombre de Roster)
+      // gadmToRoster: clave PROV|DEPT (province-aware) para evitar colisiones entre
+      // deptos homónimos en distintas provincias (ej: VeinticincodeMayo en BA vs SJ vs RN)
       if (gadmDept && rosterDept) {
-        gadmToRoster[gadmDept] = { rosterDept, rosterProv: rosterProv || bcProv || gadmProv };
+        const gadmProvNorm = normGadm(gadmProv);
+        const compoundRosterKey = gadmProvNorm + '|' + gadmDept;
+        gadmToRoster[compoundRosterKey] = { rosterDept, rosterProv: rosterProv || bcProv || gadmProv };
+        // Fallback dept-only (no-overwrite) para compatibilidad
+        if (!gadmToRoster[gadmDept]) {
+          gadmToRoster[gadmDept] = { rosterDept, rosterProv: rosterProv || bcProv || gadmProv };
+        }
       }
 
       if (!bcDept || !gadmDept) return; // solo filas con datos en col F
 
-      // Buscar DEPTO_ID: primero prov+partido, luego solo partido
+      // Buscar DEPTO_ID: solo por prov+partido (province-aware)
+      // No usar bcDeptOnly como fallback: causaba que depts homónimos en distintas provincias
+      // (ej: VeinticincodeMayo en RN) heredaran el ID de BA → zona incorrecta vía idToZona
       const bcKey = norm(bcProv || gadmProv) + '|' + norm(bcDept);
-      const id    = bcLookup[bcKey] || bcDeptOnly[norm(bcDept)];
+      const id    = bcLookup[bcKey];
       if (!id) return;
 
       // Agregar al nameToId usando normGadm (CamelCase-aware) para que coincida con MapaTab

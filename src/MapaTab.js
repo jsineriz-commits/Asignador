@@ -263,22 +263,43 @@ function LeafletMap({
   // Resolver zona por key (proba numeric ID → deptoMap por nombre)
   const getZona = useCallback((key,nombre)=>{
     const numId=Number(key);
-    // Path 1: clave numérica → idToZona (del Roster-Regiones col C)
+    // Path 1: ID numérico → idToZona (más confiable)
     if(numId && zonaData?.idToZona?.[numId]) return zonaData.idToZona[numId];
-    // Path 2: clave exacta en deptoMap (ej. "CARLOS TEJEDOR")
+    // Path 2: clave exacta en deptoMap (PROV|DEPT compound o dept-only)
     if(zonaData?.deptoMap?.[key]?.zona) return zonaData.deptoMap[key].zona;
-    // Path 2b: extraer parte dept de clave "PROV|DEPT" (ej. "BUENOS AIRES|CARLOS TEJEDOR" → "CARLOS TEJEDOR")
+    // Path 2b: si key tiene formato PROV|DEPT → intentar uppercase
+    // IMPORTANTE: si no matchea, retornar '' de inmediato.
+    // No seguir buscando por dept solo — eso causaba el bug (RioNegro/VeinticincodeMayo
+    // heredaba la zona de BsAs/VeinticincodeMayo al buscar solo por nombre dept)
     if(key?.includes('|')){
-      const deptPart=key.split('|').slice(1).join('|');
-      if(zonaData?.deptoMap?.[deptPart]?.zona) return zonaData.deptoMap[deptPart].zona;
+      const upperKey = key.toUpperCase();
+      if(zonaData?.deptoMap?.[upperKey]?.zona) return zonaData.deptoMap[upperKey].zona;
+    // Path 4 para claves PROV|DEPT sin match: probar gadmToRoster con provincia
+      if(nombre&&gadmToRoster){
+        const provPart = key.split('|')[0]; // ya es norm(prov) del feature
+        // Clave province-aware: "BUENOS AIRES|VeinticincodeMayo"
+        const provRosterKey = provPart + '|' + nombre;
+        const rEntry = gadmToRoster[provRosterKey] || gadmToRoster[nombre];
+        if(rEntry?.rosterDept){
+          const rp=norm(rEntry.rosterProv||''); const rd=norm(rEntry.rosterDept);
+          // Solo usar si la provincia del roster coincide con la provincia del feature
+          if(rp && rp===provPart && zonaData?.deptoMap?.[rp+'|'+rd]?.zona)
+            return zonaData.deptoMap[rp+'|'+rd].zona;
+        }
+      }
+      return ''; // sin zona para este depto en esta provincia
     }
-    // Path 3: nombre GADM raw normalizado con norm() para manejar CamelCase
+    // Path 3: solo para claves NO-PROV|DEPT (ej: IDs numéricos que fallaron Path 1)
     const normNombre=nombre?norm(nombre):'';
     if(normNombre&&zonaData?.deptoMap?.[normNombre]?.zona) return zonaData.deptoMap[normNombre].zona;
-    // Path 4: usar gadmToRoster (col H de GADM-Match Deptos) para buscar nombre en Roster-Regiones
+    // Path 4: gadmToRoster con lookup compuesto PROV|DEPT
     if(nombre&&gadmToRoster?.[nombre]){
-      const {rosterDept}=gadmToRoster[nombre];
-      if(rosterDept){const rd=rosterDept.toUpperCase();if(zonaData?.deptoMap?.[rd]?.zona) return zonaData.deptoMap[rd].zona;}
+      const {rosterDept,rosterProv}=gadmToRoster[nombre];
+      if(rosterDept){
+        const rp=norm(rosterProv||''); const rd=norm(rosterDept);
+        if(rp&&zonaData?.deptoMap?.[rp+'|'+rd]?.zona) return zonaData.deptoMap[rp+'|'+rd].zona;
+        if(zonaData?.deptoMap?.[rd]?.zona) return zonaData.deptoMap[rd].zona;
+      }
     }
     return '';
   },[zonaData,gadmToRoster]);
@@ -587,8 +608,13 @@ export default function MapaTab({data188ext,data189,selectedDeptos=[],onDeptoFil
     if(zona) return zona;
     const numId=Number(key);
     if(numId&&zonaData?.idToZona?.[numId]) return zonaData.idToZona[numId];
+    // Exact key (works for PROV|DEPT compound keys)
     if(zonaData?.deptoMap?.[key]?.zona) return zonaData.deptoMap[key].zona;
-    if(key?.includes('|')){const deptPart=key.split('|').slice(1).join('|');if(zonaData?.deptoMap?.[deptPart]?.zona) return zonaData.deptoMap[deptPart].zona;}
+    // key es PROV|DEPT → NO tirar la provincia (bug fix)
+    if(key?.includes('|')){
+      const upperKey=key.toUpperCase();
+      if(zonaData?.deptoMap?.[upperKey]?.zona) return zonaData.deptoMap[upperKey].zona;
+    }
     return '';
   },[zonaData]);
 

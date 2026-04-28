@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getSheetData } from '../../../../lib/sociedades/sheets.js';
 
 export const dynamic = 'force-dynamic';
@@ -64,18 +64,25 @@ export async function GET() {
       return best || z;
     }
 
-    // â”€â”€ Paso 3: deptoMap con ID numÃ©rico como clave primaria â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    // deptoMap (por nombre, para compatibilidad con GADM): DEPT_UPPER â†’ { id, provincia, zona, responsable }
+    // ── Función de normalización (strip acentos + uppercase, sin CamelCase split)
+    // Debe coincidir con norm() de MapaTab.js para nombres de Roster-Regiones ya limpios
+    function normKey(s) {
+      return String(s || '').trim().toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
+    // ── Paso 3: deptoMap con PROV|DEPT como clave primaria ──────────────────────
+    // Esto evita la colisión de depts homónimos en distintas provincias
+    // (ej: "Veinticinco de Mayo" en Buenos Aires ≠ "Veinticinco de Mayo" en Río Negro)
     const deptoMap    = {};
-    // idToZona: DEPTO_ID â†’ zona (matching robusto por ID)
     const idToZona    = {};
-    // idToInfo: DEPTO_ID â†’ { provincia, departamento, zona, responsable }
     const idToInfo    = {};
     const zonasSet    = new Set();
 
     data.forEach(row => {
-      const prov = String(row[iProvA] || '').trim().toUpperCase();
-      const dept = String(row[iDeptB] || '').trim().toUpperCase();
+      const prov = normKey(row[iProvA]);
+      const dept = normKey(row[iDeptB]);
       const id   = Number(row[iIdC]) || null;
       const zona = resolveZona(row[iZonaD]);
       const resp = String(row[iRespE] || '').trim();
@@ -83,7 +90,15 @@ export async function GET() {
       if (!dept || !prov) return;
 
       const info = { id, provincia: prov, zona, responsable: resp };
-      deptoMap[dept] = info;
+
+      // Clave primaria: PROV|DEPT — siempre única (fix colisión)
+      const compoundKey = prov + '|' + dept;
+      deptoMap[compoundKey] = info;
+
+      // Clave secundaria: dept-only — solo si no hay colisión previa
+      // Permite lookups de compatibilidad para depts no ambiguos
+      if (!deptoMap[dept]) deptoMap[dept] = info;
+
       if (id) {
         idToZona[id] = zona;
         idToInfo[id] = { provincia: prov, departamento: dept, zona, responsable: resp };
