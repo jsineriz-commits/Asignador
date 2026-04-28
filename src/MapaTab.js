@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
 // ─── Paleta UI ─────────────────────────────────────────────────────────
@@ -286,10 +286,19 @@ function LeafletMap({
   // ── Init map ───────────────────────────────────────────────────────
   useEffect(()=>{
     async function init(){
-      if(!cRef.current||mapR.current) return;
+      if(!cRef.current) return;
       const L=(await import('leaflet')).default;
       LRef.current=L;
       await import('leaflet/dist/leaflet.css');
+
+      // Destruir instancia previa si el contenedor ya fue inicializado
+      // (ocurre en hot reload de Next.js dev o doble mount de StrictMode)
+      if(cRef.current._leaflet_id) {
+        if(mapR.current) { mapR.current.remove(); mapR.current=null; }
+        else { L.map(cRef.current).remove(); }
+      }
+      if(mapR.current) return;
+
       const map=L.map(cRef.current,{center:[-37.5,-64.5],zoom:4,zoomControl:false,preferCanvas:false});
       mapR.current=map;
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
@@ -506,7 +515,7 @@ export default function MapaTab({data188ext,data189,selectedDeptos=[],onDeptoFil
   const [zonaData,    setZonaData]    = useState(null);
   const [deptoIds,    setDeptoIds]    = useState(null);
   const [gadmToId,    setGadmToId]    = useState({}); // GID_2 → DEPTO_ID_str
-  const [filterMode,  setFilterMode]  = useState('provincias');
+  const [filterMode,  setFilterMode]  = useState('departamentos');
   const [activeInfo,  setActiveInfo]  = useState(null);
   const [isClient,    setIsClient]    = useState(false);
 

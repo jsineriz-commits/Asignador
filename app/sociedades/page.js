@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import dynamic from 'next/dynamic';
@@ -43,6 +43,8 @@ export default function Home() {
   const [filtroTextoGeneral, setFiltroTextoGeneral] = useState('');
   const [visibleCountSOC, setVisibleCountSOC] = useState(30);
   const [sociedadFilter, setSociedadFilter] = useState('todas');
+  // Set para multi-selección de libres/mermas
+  const [activeSubFilters, setActiveSubFilters] = useState(new Set());
   const [exportando, setExportando] = useState(false);
   
   const [data189, setData189] = useState(null);
@@ -433,26 +435,40 @@ export default function Home() {
   // Filtro interno de la pestaña Sociedades Detalle
   const socFiltered = useMemo(() => {
     const all = tables?.dt_sociedades || [];
-    if (sociedadFilter === 'bc')     return all.filter(r => r.existe_en_dcac !== 'SI');
-    if (sociedadFilter === 'dcac')   return all.filter(r => r.existe_en_dcac === 'SI');
-    if (sociedadFilter === 'libres') return all.filter(r =>
-      r.existe_en_dcac === 'SI' && r._dcRow &&
-      !r._dcRow.asociado_comercial && !r._dcRow.representante
-    );
-    if (sociedadFilter === 'mermas') return all.filter(r => {
+    // Filtros exclusivos
+    if (sociedadFilter === 'bc')   return all.filter(r => r.existe_en_dcac !== 'SI');
+    if (sociedadFilter === 'dcac') return all.filter(r => r.existe_en_dcac === 'SI');
+
+    // Helpers para libres y mermas
+    const isLibre = r => {
       if (r.existe_en_dcac !== 'SI' || !r._dcRow) return false;
-      // Debe tener AC o Representante asignado
-      const tieneAsignado = r._dcRow.asociado_comercial || r._dcRow.representante;
-      if (!tieneAsignado) return false;
-      // Sin actividad hace 15+ meses (o nunca tuvo)
+      if (r._dcRow.asociado_comercial || r._dcRow.representante) return false;
       const ultimo = r._dcRow.Ult_act || r._dcRow.Ult_op;
-      if (!ultimo) return true; // nunca tuvo actividad = merma
-      const hace15m = new Date();
-      hace15m.setMonth(hace15m.getMonth() - 15);
+      if (!ultimo) return true;
+      const hace15m = new Date(); hace15m.setMonth(hace15m.getMonth() - 15);
       return new Date(ultimo) < hace15m;
-    });
+    };
+    const isMerma = r => {
+      if (r.existe_en_dcac !== 'SI' || !r._dcRow) return false;
+      if (!(r._dcRow.asociado_comercial || r._dcRow.representante)) return false;
+      const ultimo = r._dcRow.Ult_act || r._dcRow.Ult_op;
+      if (!ultimo) return true;
+      const hace15m = new Date(); hace15m.setMonth(hace15m.getMonth() - 15);
+      return new Date(ultimo) < hace15m;
+    };
+
+    // Multi-selección libres + mermas
+    if (sociedadFilter === 'sub') {
+      const wantLibres = activeSubFilters.has('libres');
+      const wantMermas = activeSubFilters.has('mermas');
+      if (wantLibres && wantMermas) return all.filter(r => isLibre(r) || isMerma(r));
+      if (wantLibres) return all.filter(isLibre);
+      if (wantMermas) return all.filter(isMerma);
+      return all; // ninguno activo
+    }
+
     return all; // 'todas'
-  }, [tables, sociedadFilter]);
+  }, [tables, sociedadFilter, activeSubFilters]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)' }}>
@@ -806,17 +822,35 @@ export default function Home() {
                     <div style={{padding:'1rem 1.25rem',borderBottom:'1px solid var(--border-color)',background:'#f8fafc',display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                       <h2 style={{fontSize:'1.1rem',fontWeight:600,margin:0,marginRight:12}}>Sociedades Detalle</h2>
                       {[
-                        {k:'todas',  l:'Todas',              c:'#475569'},
-                        {k:'bc',     l:'Solo BC (sin dCaC)', c:'#7c3aed'},
-                        {k:'dcac',   l:'En dCaC',            c:'#2563eb'},
-                        {k:'libres', l:'Cuentas Libres',     c:'#059669'},
-                        {k:'mermas', l:'⚠️ Mermas',          c:'#dc2626'},
-                      ].map(({k,l,c}) => (
+                        {k:'todas',  l:'Todas',              c:'#475569', exclusive:true},
+                        {k:'bc',     l:'Solo BC (sin dCaC)', c:'#7c3aed', exclusive:true},
+                        {k:'dcac',   l:'En dCaC',            c:'#2563eb', exclusive:true},
+                        {k:'libres', l:'Cuentas Libres',     c:'#059669', exclusive:false},
+                        {k:'mermas', l:'⚠️ Mermas',          c:'#dc2626', exclusive:false},
+                      ].map(({k,l,c,exclusive}) => {
+                        const isActive = exclusive
+                          ? sociedadFilter === k
+                          : sociedadFilter === 'sub' && activeSubFilters.has(k);
+                        return (
                         <button key={k}
-                          onClick={() => { setSociedadFilter(k); setVisibleCountSOC(30); }}
-                          style={{padding:'4px 14px',borderRadius:99,border:`1.5px solid ${sociedadFilter===k?c:'#e2e8f0'}`,background:sociedadFilter===k?c:'#fff',color:sociedadFilter===k?'#fff':c,fontWeight:600,fontSize:12,cursor:'pointer',transition:'all 0.15s'}}
+                          onClick={() => {
+                            setVisibleCountSOC(30);
+                            if (exclusive) {
+                              setSociedadFilter(k);
+                              setActiveSubFilters(new Set());
+                            } else {
+                              setActiveSubFilters(prev => {
+                                const next = new Set(prev);
+                                next.has(k) ? next.delete(k) : next.add(k);
+                                return next;
+                              });
+                              setSociedadFilter('sub');
+                            }
+                          }}
+                          style={{padding:'4px 14px',borderRadius:99,border:`1.5px solid ${isActive?c:'#e2e8f0'}`,background:isActive?c:'#fff',color:isActive?'#fff':c,fontWeight:600,fontSize:12,cursor:'pointer',transition:'all 0.15s'}}
                         >{l}</button>
-                      ))}
+                        );
+                      })}
                       <span style={{marginLeft:'auto',fontSize:12,color:'#64748b'}}>{socFiltered.length} sociedades</span>
                       <button
                         onClick={handleExportSheets}
