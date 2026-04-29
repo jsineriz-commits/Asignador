@@ -113,6 +113,28 @@ export async function GET() {
       deptoMap['CIUDAD DE BUENOS AIRES|DISTRITO FEDERAL'] = cabaEntry;
     }
 
+    // ── Aliases BA: Q202 (Metabase) usa nombres distintos al GADM/Roster ──────────
+    // Formato: deptoMap['PROV_GADM|NOMBRE_Q202'] = entrada del Roster
+    // Esto permite que buildByDepto (que usa norm(Q202name)) y getZona coincidan.
+    const baAliases = [
+      // GADM: "GeneralJuanMadariaga" → normGadm → "GENERAL JUAN MADARIAGA" (Roster)
+      // Q202: "GENERAL MADARIAGA" → byDepto key = "BUENOS AIRES|GENERAL MADARIAGA"
+      ['BUENOS AIRES|GENERAL MADARIAGA',        'BUENOS AIRES|GENERAL JUAN MADARIAGA'],
+      // GADM: "GeneralLaMadrid" → normGadm → "GENERAL LA MADRID" (Roster)
+      // Q202: "GENERAL LAMADRID" → byDepto key = "BUENOS AIRES|GENERAL LAMADRID"
+      ['BUENOS AIRES|GENERAL LAMADRID',         'BUENOS AIRES|GENERAL LA MADRID'],
+      // GADM: "AdolfoGonzalesChaves" → normGadm → "ADOLFO GONZALES CHAVES" (Roster)
+      // Q202: "GONZALES CHAVES" → byDepto key = "BUENOS AIRES|GONZALES CHAVES"
+      ['BUENOS AIRES|GONZALES CHAVES',          'BUENOS AIRES|ADOLFO GONZALES CHAVES'],
+      // La Rioja: GADM "SanBlasdelosSauces" → normGadm (sin LOS rule) → "SAN BLASDELOS SAUCES"
+      ['LA RIOJA|SAN BLASDELOS SAUCES',          'LA RIOJA|SAN BLAS DE LOS SAUCES'],
+    ];
+    baAliases.forEach(([aliasKey, rosterKey]) => {
+      if (deptoMap[rosterKey] && !deptoMap[aliasKey]) {
+        deptoMap[aliasKey] = deptoMap[rosterKey];
+      }
+    });
+
     // â”€â”€ Paso 4: deptos agrupados por zona (usando nombres) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const zonaDeptos = {};
     Object.entries(deptoMap).forEach(([dept, info]) => {

@@ -35,11 +35,6 @@ function norm(name) {
     // "SANTIAGODEL ESTERO" → "SANTIAGO DEL ESTERO"
     .replace(/(\w+?)DEL\b/g,'$1 DEL')
     // "VEINTICINCODE" → "VEINTICINCO DE"
-    .replace(/(\w+?)DE\b/g,'$1 DE')
-    // (?=\s): solo separar cuando el artículo va seguido de otra palabra
-    // evita "CERRILLOS"→"CERRIL LOS" o "AMARILLAS"→"AMARIL LAS"
-    .replace(/(\w+?)LAS\b(?=\s)/g,'$1 LAS')
-    .replace(/(\w+?)LOS\b(?=\s)/g,'$1 LOS')
     // Segunda pasada DE: captura "BLASDE" que quedó del LOS-rule
     .replace(/(\w+?)DE\b/g,'$1 DE')
     // Post-fix: palabras completas que el regex DE partió incorrectamente
