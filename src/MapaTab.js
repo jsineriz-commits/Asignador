@@ -30,14 +30,20 @@ function norm(name) {
     .replace(/\bSTA\b/g,'SANTA').replace(/\bSTO\b/g,'SANTO')
     .replace(/\bTTE\b/g,'TENIENTE').replace(/\bPTE\b/g,'PRESIDENTE')
     // Reparar artículos fusionados en CamelCase GADM:
-    // "VEINTICINCODE MAYO" → "VEINTICINCO DE MAYO"
-    // "GENERALDELASHOCES" → "GENERAL DEL LAS HACES" etc.
+    // "ANTOFAGASTADELA SIERRA" → "ANTOFAGASTA DE LA SIERRA"
+    .replace(/(\w+?)DELA\b/g,'$1 DE LA')
+    // "SANTIAGODEL ESTERO" → "SANTIAGO DEL ESTERO"
     .replace(/(\w+?)DEL\b/g,'$1 DEL')
+    // "VEINTICINCODE" → "VEINTICINCO DE"
+    // Segunda pasada DE: captura "BLASDE" que quedó del LOS-rule
     .replace(/(\w+?)DE\b/g,'$1 DE')
-    .replace(/(\w+?)LAS\b/g,'$1 LAS')
-    .replace(/(\w+?)LOS\b/g,'$1 LOS')
+    // Post-fix: palabras completas que el regex DE partió incorrectamente
+    .replace(/\bGRAN DE\b/g,'GRANDE')
+    .replace(/\bVER DE\b/g,'VERDE')
     .replace(/\s+/g,' ').trim();
 }
+
+
 
 // ─── Abreviaturas de provincia en Q188 → nombre completo ───────────────
 const PROV_ABBR = {
@@ -161,8 +167,49 @@ function buildByDepto(data, bcLookup, bcDeptOnly) {
     // Ej: byDepto["350"] y byDepto["BUENOS AIRES|NUEVE DE JULIO"] apuntan al mismo objeto
     if (key !== strKey) m[strKey] = m[key];
   });
+
+  // ── Aliases GADM→Q202: cuando el nombre GADM (normGadm) difiere del nombre Q202 ──
+  // GADM feature key (fKey) → byDepto key de Q202
+  // Permite que el mapa muestre datos cuando el nombre geográfico GADM ≠ nombre Metabase
+  const GADM_Q202_ALIASES = [
+    // BA: GADM "GeneralJuanMadariaga" → fKey "BUENOS AIRES|GENERAL JUAN MADARIAGA"
+    //     Q202 devuelve "GENERAL MADARIAGA" → byDepto key "BUENOS AIRES|GENERAL MADARIAGA"
+    ['BUENOS AIRES|GENERAL JUAN MADARIAGA',         'BUENOS AIRES|GENERAL MADARIAGA'],
+    // BA: GADM "GeneralLaMadrid" → fKey "BUENOS AIRES|GENERAL LA MADRID"
+    //     Q202 devuelve "GENERAL LAMADRID"
+    ['BUENOS AIRES|GENERAL LA MADRID',              'BUENOS AIRES|GENERAL LAMADRID'],
+    // BA: GADM "AdolfoGonzalesChaves" → fKey "BUENOS AIRES|ADOLFO GONZALES CHAVES"
+    //     Q202 devuelve "GONZALES CHAVES"
+    ['BUENOS AIRES|ADOLFO GONZALES CHAVES',         'BUENOS AIRES|GONZALES CHAVES'],
+    // BA: GADM "NuevedeJulio" → fKey "BUENOS AIRES|9 DE JULIO" (via gadmRawToNorm col D)
+    //     pero Q202 devuelve "NUEVE DE JULIO" → byDepto key "BUENOS AIRES|NUEVE DE JULIO"
+    ['BUENOS AIRES|9 DE JULIO',                    'BUENOS AIRES|NUEVE DE JULIO'],
+    // BA: GADM "VeinticincodeMayo" → fKey "BUENOS AIRES|VEINTICINCO DE MAYO" O "BUENOS AIRES|25 DE MAYO"
+    ['BUENOS AIRES|25 DE MAYO',                    'BUENOS AIRES|VEINTICINCO DE MAYO'],
+    // BA: GADM "Brandsen" → fKey "BUENOS AIRES|BRANDSEN" | Q202: "CORONEL BRANDSEN"
+    ['BUENOS AIRES|BRANDSEN',                      'BUENOS AIRES|CORONEL BRANDSEN'],
+    // BA: Roster "FLORENTINO AMEGHINO" | Q202: "AMEGHINO"
+    ['BUENOS AIRES|FLORENTINO AMEGHINO',            'BUENOS AIRES|AMEGHINO'],
+    // BA: Roster "CORONEL DE MARINA L ROSALES" | Q202: "CORONEL ROSALES"
+    ['BUENOS AIRES|CORONEL DE MARINA L ROSALES',   'BUENOS AIRES|CORONEL ROSALES'],
+    // Corrientes: GADM/Roster "MBURUCUYA" | Q202: "MBUCURUYA"
+    ['CORRIENTES|MBURUCUYA',                       'CORRIENTES|MBUCURUYA'],
+    // La Pampa: Roster "CHICAL CO" | Q202: "CHICALCO"
+    ['LA PAMPA|CHICAL CO',                         'LA PAMPA|CHICALCO'],
+    // Santiago del Estero: Roster "BANDA" | Q202: "LA BANDA"
+    ['SANTIAGO DEL ESTERO|BANDA',                  'SANTIAGO DEL ESTERO|LA BANDA'],
+    // Salta: Roster "LA CANDELARIA" | Q202: "CANDELARIA"
+    ['SALTA|LA CANDELARIA',                        'SALTA|CANDELARIA'],
+    // Salta: Roster "CAPITAL" | Q202: "LA CAPITAL"
+    ['SALTA|CAPITAL',                              'SALTA|LA CAPITAL'],
+  ];
+  GADM_Q202_ALIASES.forEach(([gadmKey, q202Key]) => {
+    if (m[q202Key] && !m[gadmKey]) m[gadmKey] = m[q202Key];
+  });
+
   return m;
 }
+
 
 // ─── Centroide simple de feature GeoJSON ──────────────────────────────
 function computeCentroid(feature) {
