@@ -113,27 +113,63 @@ export async function GET() {
       deptoMap['CIUDAD DE BUENOS AIRES|DISTRITO FEDERAL'] = cabaEntry;
     }
 
-    // ── Aliases BA: Q202 (Metabase) usa nombres distintos al GADM/Roster ──────────
-    // Formato: deptoMap['PROV_GADM|NOMBRE_Q202'] = entrada del Roster
-    // Esto permite que buildByDepto (que usa norm(Q202name)) y getZona coincidan.
-    const baAliases = [
-      // GADM: "GeneralJuanMadariaga" → normGadm → "GENERAL JUAN MADARIAGA" (Roster)
-      // Q202: "GENERAL MADARIAGA" → byDepto key = "BUENOS AIRES|GENERAL MADARIAGA"
-      ['BUENOS AIRES|GENERAL MADARIAGA',        'BUENOS AIRES|GENERAL JUAN MADARIAGA'],
-      // GADM: "GeneralLaMadrid" → normGadm → "GENERAL LA MADRID" (Roster)
-      // Q202: "GENERAL LAMADRID" → byDepto key = "BUENOS AIRES|GENERAL LAMADRID"
-      ['BUENOS AIRES|GENERAL LAMADRID',         'BUENOS AIRES|GENERAL LA MADRID'],
-      // GADM: "AdolfoGonzalesChaves" → normGadm → "ADOLFO GONZALES CHAVES" (Roster)
-      // Q202: "GONZALES CHAVES" → byDepto key = "BUENOS AIRES|GONZALES CHAVES"
-      ['BUENOS AIRES|GONZALES CHAVES',          'BUENOS AIRES|ADOLFO GONZALES CHAVES'],
-      // La Rioja: GADM "SanBlasdelosSauces" → normGadm (sin LOS rule) → "SAN BLASDELOS SAUCES"
-      ['LA RIOJA|SAN BLASDELOS SAUCES',          'LA RIOJA|SAN BLAS DE LOS SAUCES'],
+    // ── Aliases: Q202 (Metabase) usa nombres distintos al Roster ─────────────────
+    // Formato: deptoMap['PROV|NOMBRE_Q202'] = entrada del Roster (PROV|NOMBRE_ROSTER)
+    // Cubre: números en palabras, nombres abreviados, diferencias de escritura.
+    const deptoAliases = [
+      // ── Buenos Aires ──
+      // GADM y Roster: "GENERAL JUAN MADARIAGA" | Q202: "GENERAL MADARIAGA"
+      ['BUENOS AIRES|GENERAL MADARIAGA',             'BUENOS AIRES|GENERAL JUAN MADARIAGA'],
+      // GADM y Roster: "GENERAL LA MADRID" | Q202: "GENERAL LAMADRID"
+      ['BUENOS AIRES|GENERAL LAMADRID',              'BUENOS AIRES|GENERAL LA MADRID'],
+      // GADM y Roster: "ADOLFO GONZALES CHAVES" | Q202: "GONZALES CHAVES"
+      ['BUENOS AIRES|GONZALES CHAVES',               'BUENOS AIRES|ADOLFO GONZALES CHAVES'],
+      // Q202: "NUEVE DE JULIO" | Roster: "9 DE JULIO"
+      ['BUENOS AIRES|NUEVE DE JULIO',                'BUENOS AIRES|9 DE JULIO'],
+      // Q202: "VEINTICINCO DE MAYO" | Roster: "25 DE MAYO"
+      ['BUENOS AIRES|VEINTICINCO DE MAYO',           'BUENOS AIRES|25 DE MAYO'],
+      // Q202: "CORONEL BRANDSEN" | Roster: "BRANDSEN"
+      ['BUENOS AIRES|CORONEL BRANDSEN',              'BUENOS AIRES|BRANDSEN'],
+      // Q202: "AMEGHINO" | Roster: "FLORENTINO AMEGHINO"
+      ['BUENOS AIRES|AMEGHINO',                      'BUENOS AIRES|FLORENTINO AMEGHINO'],
+      // Q202: "CORONEL ROSALES" | Roster: "CORONEL DE MARINA L ROSALES"
+      ['BUENOS AIRES|CORONEL ROSALES',               'BUENOS AIRES|CORONEL DE MARINA L ROSALES'],
+      // ── Santa Fe ──
+      // Q202: "NUEVE DE JULIO" | Roster: "9 DE JULIO"
+      ['SANTA FE|NUEVE DE JULIO',                    'SANTA FE|9 DE JULIO'],
+      // ── Chaco ──
+      // Q202: "VEINTICINCO DE MAYO" | Roster: "25 DE MAYO"
+      ['CHACO|VEINTICINCO DE MAYO',                  'CHACO|25 DE MAYO'],
+      // Q202: "PRIMERO DE MAYO" | Roster: "1 DE MAYO"
+      ['CHACO|PRIMERO DE MAYO',                      'CHACO|1 DE MAYO'],
+      // Q202: "DOCE DE OCTUBRE" | Roster: "12 DE OCTUBRE"
+      ['CHACO|DOCE DE OCTUBRE',                      'CHACO|12 DE OCTUBRE'],
+      // Q202: "NUEVE DE JULIO" | Roster: "9 DE JULIO"
+      ['CHACO|NUEVE DE JULIO',                       'CHACO|9 DE JULIO'],
+      // ── Corrientes ──
+      // Q202: "MBUCURUYA" (typo) | Roster: "MBURUCUYA"
+      ['CORRIENTES|MBUCURUYA',                       'CORRIENTES|MBURUCUYA'],
+      // ── La Pampa ──
+      // Q202: "CHICALCO" | Roster: "CHICAL CO"
+      ['LA PAMPA|CHICALCO',                          'LA PAMPA|CHICAL CO'],
+      // ── Santiago del Estero ──
+      // Q202: "LA BANDA" | Roster: "BANDA"
+      ['SANTIAGO DEL ESTERO|LA BANDA',               'SANTIAGO DEL ESTERO|BANDA'],
+      // ── Salta ──
+      // Q202: "CANDELARIA" | Roster: "LA CANDELARIA"
+      ['SALTA|CANDELARIA',                           'SALTA|LA CANDELARIA'],
+      // Q202: "LA CAPITAL" | Roster: "CAPITAL"
+      ['SALTA|LA CAPITAL',                           'SALTA|CAPITAL'],
+      // ── La Rioja ──
+      // GADM "SanBlasdelosSauces" → normGadm (sin LOS rule) → "SAN BLASDELOS SAUCES"
+      ['LA RIOJA|SAN BLASDELOS SAUCES',              'LA RIOJA|SAN BLAS DE LOS SAUCES'],
     ];
-    baAliases.forEach(([aliasKey, rosterKey]) => {
+    deptoAliases.forEach(([aliasKey, rosterKey]) => {
       if (deptoMap[rosterKey] && !deptoMap[aliasKey]) {
         deptoMap[aliasKey] = deptoMap[rosterKey];
       }
     });
+
 
     // â”€â”€ Paso 4: deptos agrupados por zona (usando nombres) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const zonaDeptos = {};
