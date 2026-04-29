@@ -30,14 +30,25 @@ function norm(name) {
     .replace(/\bSTA\b/g,'SANTA').replace(/\bSTO\b/g,'SANTO')
     .replace(/\bTTE\b/g,'TENIENTE').replace(/\bPTE\b/g,'PRESIDENTE')
     // Reparar artículos fusionados en CamelCase GADM:
-    // "VEINTICINCODE MAYO" → "VEINTICINCO DE MAYO"
-    // "GENERALDELASHOCES" → "GENERAL DEL LAS HACES" etc.
+    // "ANTOFAGASTADELA SIERRA" → "ANTOFAGASTA DE LA SIERRA"
+    .replace(/(\w+?)DELA\b/g,'$1 DE LA')
+    // "SANTIAGODEL ESTERO" → "SANTIAGO DEL ESTERO"
     .replace(/(\w+?)DEL\b/g,'$1 DEL')
+    // "VEINTICINCODE" → "VEINTICINCO DE"
     .replace(/(\w+?)DE\b/g,'$1 DE')
-    .replace(/(\w+?)LAS\b/g,'$1 LAS')
-    .replace(/(\w+?)LOS\b/g,'$1 LOS')
+    // (?=\s): solo separar cuando el artículo va seguido de otra palabra
+    // evita "CERRILLOS"→"CERRIL LOS" o "AMARILLAS"→"AMARIL LAS"
+    .replace(/(\w+?)LAS\b(?=\s)/g,'$1 LAS')
+    .replace(/(\w+?)LOS\b(?=\s)/g,'$1 LOS')
+    // Segunda pasada DE: captura "BLASDE" que quedó del LOS-rule
+    .replace(/(\w+?)DE\b/g,'$1 DE')
+    // Post-fix: palabras completas que el regex DE partió incorrectamente
+    .replace(/\bGRAN DE\b/g,'GRANDE')
+    .replace(/\bVER DE\b/g,'VERDE')
     .replace(/\s+/g,' ').trim();
 }
+
+
 
 // ─── Abreviaturas de provincia en Q188 → nombre completo ───────────────
 const PROV_ABBR = {

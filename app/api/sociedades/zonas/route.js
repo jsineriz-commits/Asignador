@@ -106,6 +106,13 @@ export async function GET() {
       if (zona) zonasSet.add(zona);
     });
 
+    // ── Alias CABA: GADM usa "CiudaddeBuenosAires"→"CIUDAD DE BUENOS AIRES"
+    // y "DistritoFederal"→"DISTRITO FEDERAL", pero Roster usa provincia="CAPITAL FEDERAL" dept="CABA"
+    const cabaEntry = deptoMap['CAPITAL FEDERAL|CABA'] || deptoMap['CABA'];
+    if (cabaEntry) {
+      deptoMap['CIUDAD DE BUENOS AIRES|DISTRITO FEDERAL'] = cabaEntry;
+    }
+
     // â”€â”€ Paso 4: deptos agrupados por zona (usando nombres) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const zonaDeptos = {};
     Object.entries(deptoMap).forEach(([dept, info]) => {
