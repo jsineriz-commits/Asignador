@@ -1,6 +1,28 @@
 import { NextResponse } from "next/server";
 import { getGoogleAccessToken } from "@/lib/google-jwt";
 
+// Expansión de abreviaturas de provincia usadas en Metabase y Base Clave
+const PROV_EXPAND: Record<string, string> = {
+  'BA':'Buenos Aires','BUE':'Buenos Aires','BSAS':'Buenos Aires','PBA':'Buenos Aires',
+  'CAT':'Catamarca','CHA':'Chaco','CHU':'Chubut',
+  'CBA':'Córdoba','COR':'Corrientes',
+  'ER':'Entre Ríos','RIOS':'Entre Ríos',
+  'FOR':'Formosa','JUJ':'Jujuy',
+  'LPA':'La Pampa','PAMPA':'La Pampa',
+  'LRI':'La Rioja','RIOJA':'La Rioja',
+  'MZA':'Mendoza','MEN':'Mendoza','MIS':'Misiones',
+  'NEU':'Neuquén','RNG':'Río Negro','NEGRO':'Río Negro',
+  'SAL':'Salta','SJU':'San Juan','SLU':'San Luis',
+  'SCR':'Santa Cruz','SF':'Santa Fe','SFE':'Santa Fe',
+  'SDE':'Santiago del Estero','TDF':'Tierra del Fuego','TUC':'Tucumán',
+  'CABA':'Ciudad Autónoma de Buenos Aires','CAP':'Ciudad Autónoma de Buenos Aires',
+};
+function expandProv(raw: string): string {
+  if (!raw) return '';
+  const up = raw.trim().toUpperCase();
+  return PROV_EXPAND[up] || raw.trim();
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -209,7 +231,7 @@ export async function POST(req: Request) {
                   nombre: getField(["nombre"]),
                   apellido: getField(["apellido"]),
                   email: getField(["email", "correo"]),
-                  provincia: getField(["provincia", "provincia usuario"]),
+                  provincia: expandProv(getField(["provincia", "provincia usuario"])),
                   partido: getField(["partido", "partido usuario"]),
                   telefono: getField(["telefono", "teléfono"]),
                   ofrecio: getField(["ofrecio", "ofreció"]),
@@ -285,7 +307,7 @@ export async function POST(req: Request) {
                   nombre: propietarioIndex !== -1 ? (row[propietarioIndex] || row[productorIndex] || "") : (row[productorIndex] || ""),
                   apellido: "",
                   email: (row[emailsIndex] || "").split(" ")[0] || "",
-                  provincia: row[provinciaIndex] || "",
+                  provincia: expandProv(row[provinciaIndex] || ""),
                   partido: row[partidoIndex] || "",
                   telefono: (row[telefonosIndex] || "").split(" ")[0] || "",
                   source: "base_clave"

@@ -353,6 +353,7 @@ function LeafletMap({
 
   // ── Init map ───────────────────────────────────────────────────────
   useEffect(()=>{
+    let ro;
     async function init(){
       if(!cRef.current) return;
       const L=(await import('leaflet')).default;
@@ -372,10 +373,21 @@ function LeafletMap({
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
         {attribution:'&copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
       L.control.zoom({position:'topright'}).addTo(map);
+
+      // ResizeObserver: llama invalidateSize() cada vez que el container
+      // cambia de tamaño — cubre el caso donde flexbox calcula después del init
+      ro = new ResizeObserver(() => {
+        if(mapR.current) mapR.current.invalidateSize();
+      });
+      ro.observe(cRef.current);
     }
     init();
-    return()=>{if(mapR.current){mapR.current.remove();mapR.current=null;}};
+    return()=>{
+      if(ro) ro.disconnect();
+      if(mapR.current){mapR.current.remove();mapR.current=null;}
+    };
   },[]);
+
 
   // ── Capa HEATMAP ──────────────────────────────────────────────────
   useEffect(()=>{
@@ -447,6 +459,10 @@ function LeafletMap({
       },
     }).addTo(map);
     lyrHeatR.current=layer;
+
+    // Forzar recálculo de dimensiones al agregar la primera capa con datos
+    // (el heatmap es la capa más importante y la primera que se llena con datos)
+    map.invalidateSize();
 
     // Cerrar todos los tooltips al mover el mapa (drag)
     const closeTips = () => layer.closeTooltip();
