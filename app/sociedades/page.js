@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, lazy, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import SociedadLeadModal from '../../components/dashboard/SociedadLeadModal';
 
 const MapaTab   = dynamic(() => import('../../src/MapaTab'),   { ssr: false });
 const CuentasTab = dynamic(() => import('../../src/CuentasTab'), { ssr: false });
@@ -46,6 +47,11 @@ export default function Home() {
   // Set para multi-selección de libres/mermas
   const [activeSubFilters, setActiveSubFilters] = useState(new Set());
   const [exportando, setExportando] = useState(false);
+  const [pfMode, setPfMode] = useState(false);
+  const [filtro500, setFiltro500] = useState(false);
+  const [selectedSociedad, setSelectedSociedad] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   
   const [data189, setData189] = useState(null);
   const [data188, setData188] = useState(null);
@@ -74,6 +80,14 @@ export default function Home() {
       if (data && !data.error) setZonaDataSidebar(data);
     }).catch(() => {});
   }, []);
+
+  // Auto-fetch nación al cambiar a Funnel o Sociedades Detalle sin datos cargados
+  useEffect(() => {
+    if ((activeTab === 'FUNNEL' || activeTab === 'SOCIEDADES') && data188 === null && data189 === null && !loading) {
+      handleFetchData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const handleSort = (tab, field) => {
     setSortConfig(prev => {
@@ -470,35 +484,73 @@ export default function Home() {
     return all; // 'todas'
   }, [tables, sociedadFilter, activeSubFilters]);
 
+  // PF Mode: Potenciales Feedlots — filtra >= 2500 cab y ordena por menor ratio vacas/total
+  // filtro500: solo establecimientos con más de 500 cabezas
+  const socDisplay = useMemo(() => {
+    let base = socFiltered;
+    if (filtro500) base = base.filter(r => Number(r.total_bovinos || 0) > 500);
+    if (!pfMode) return base;
+    return [...base]
+      .filter(r => Number(r.total_bovinos || 0) >= 2500)
+      .sort((a, b) => {
+        const bovA = Math.max(Number(a.total_bovinos || 1), 1);
+        const bovB = Math.max(Number(b.total_bovinos || 1), 1);
+        const ratioA = Number(a.total_vacas || 0) / bovA;
+        const ratioB = Number(b.total_vacas || 0) / bovB;
+        return ratioA - ratioB; // menor % de vacas = más probable feedlot
+      });
+  }, [socFiltered, pfMode, filtro500]);
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-color)' }}>
       
-      {/* SIDEBAR DE FILTROS — hover para abrir */}
+      {/* SIDEBAR DE FILTROS */}
+      {/* Franja invisible en el borde izquierdo para activar el peek cuando está colapsado */}
+      {sidebarCollapsed && (
+        <div
+          onMouseEnter={() => setSidebarHovered(true)}
+          style={{
+            position: 'fixed', left: 0, top: 0, bottom: 0, width: 16,
+            zIndex: 150, cursor: 'pointer',
+          }}
+        />
+      )}
       <div
-        onMouseEnter={() => setSidebarOpen(true)}
-        onMouseLeave={() => setSidebarOpen(false)}
+        onMouseEnter={() => sidebarCollapsed && setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+        onClick={() => { if (sidebarCollapsed && sidebarHovered) setSidebarCollapsed(false); }}
         style={{
-          width: sidebarOpen ? '290px' : '12px',
+          width: (sidebarCollapsed && !sidebarHovered) ? 0 : '290px',
           flexShrink: 0,
           borderRight: '1px solid var(--border-color)',
-          background: sidebarOpen ? '#fff' : 'linear-gradient(to bottom, #e0e7ef, #f0f4f8)',
-          padding: sidebarOpen ? '1.1rem 0.9rem' : '0',
+          background: '#fff',
+          padding: (sidebarCollapsed && !sidebarHovered) ? 0 : '1.1rem 0.9rem',
           display: 'flex',
           flexDirection: 'column',
           height: '100vh',
-          position: 'sticky',
+          position: sidebarCollapsed ? 'fixed' : 'sticky',
+          left: 0,
           top: 0,
-          overflowY: sidebarOpen ? 'auto' : 'hidden',
+          overflowY: (sidebarCollapsed && !sidebarHovered) ? 'hidden' : 'auto',
           overflowX: 'hidden',
-          transition: 'width 0.25s ease, padding 0.25s ease',
-          cursor: sidebarOpen ? 'default' : 'pointer',
-          zIndex: 100,
-          boxShadow: sidebarOpen ? '4px 0 16px rgba(0,0,0,0.08)' : 'none',
+          zIndex: 1500,
+          boxShadow: '4px 0 16px rgba(0,0,0,0.12)',
           gap: 4,
+          transition: 'width 0.22s ease, padding 0.22s ease',
+          cursor: (sidebarCollapsed && sidebarHovered) ? 'pointer' : 'default',
         }}
       >
-        {sidebarOpen && (<>
-          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--accent)' }}>Neo<span style={{color:'#1e293b'}}>Panel</span></h2>
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--accent)', margin: 0 }}>de<span style={{color:'#1e293b'}}>CampoaCampo</span></h2>
+            <button
+              onClick={() => setSidebarCollapsed(true)}
+              title="Ocultar filtros"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', fontSize: 18, lineHeight: 1, padding: '2px 4px', borderRadius: 5, transition: 'color 0.15s' }}
+              onMouseOver={e => e.currentTarget.style.color = '#475569'}
+              onMouseOut={e => e.currentTarget.style.color = '#94a3b8'}
+            >×</button>
+          </div>
           <p style={{ fontWeight:700, fontSize:'10px', color:'#94a3b8', letterSpacing:'0.1em', marginBottom:'0.5rem', textTransform:'uppercase' }}>Filtros Geográficos</p>
 
           {/* ─── Accordión: Provincia ─── */}
@@ -510,7 +562,7 @@ export default function Home() {
               <>
                 <input placeholder="🔍 Buscar provincia..." value={searchProv} onChange={e=>setSearchProv(e.target.value)}
                   style={{width:'100%',padding:'5px 8px',borderRadius:5,border:'1px solid #e2e8f0',fontSize:12,marginBottom:6,outline:'none',boxSizing:'border-box'}}/>
-                <div style={{maxHeight:'160px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
+                <div style={{maxHeight:'220px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
                   {ALL_PROVINCES.filter(p=>p.name.toLowerCase().includes(searchProv.toLowerCase())).map(p=>(
                     <label key={p.code} style={{display:'flex',alignItems:'center',gap:7,padding:'4px 5px',borderRadius:4,cursor:'pointer',background:activeProvs.some(ap=>ap.code===p.code)?'#eff6ff':'transparent',fontSize:12.5}}>
                       <input type="checkbox" checked={activeProvs.some(ap=>ap.code===p.code)} onChange={e=>{
@@ -542,7 +594,7 @@ export default function Home() {
               <>
                 <input placeholder="🔍 Buscar zona..." value={searchZona} onChange={e=>setSearchZona(e.target.value)}
                   style={{width:'100%',padding:'5px 8px',borderRadius:5,border:'1px solid #e2e8f0',fontSize:12,marginBottom:6,outline:'none',boxSizing:'border-box'}}/>
-                <div style={{maxHeight:'160px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
+                <div style={{maxHeight:'220px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
                   {(zonaDataSidebar.zonasOrdenadas||[]).filter(z=>z.toLowerCase().includes(searchZona.toLowerCase())).map(z=>{
                     const col=zonaDataSidebar.zonaColors?.[z]||'#64748b';
                     return (
@@ -576,8 +628,8 @@ export default function Home() {
               <>
                 <input placeholder="🔍 Buscar departamento..." value={searchDept} onChange={e=>setSearchDept(e.target.value)}
                   style={{width:'100%',padding:'5px 8px',borderRadius:5,border:'1px solid #e2e8f0',fontSize:12,marginBottom:6,outline:'none',boxSizing:'border-box'}}/>
-                <div style={{maxHeight:'180px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
-                  {Object.entries(zonaDataSidebar.deptoMap||{}).filter(([n])=>!/^\d+$/.test(n)&&n.toLowerCase().includes(searchDept.toLowerCase())).sort(([a],[b])=>a.localeCompare(b)).map(([name,info])=>{
+                <div style={{maxHeight:'320px',overflowY:'auto',display:'flex',flexDirection:'column',gap:1}}>
+                  {Object.entries(zonaDataSidebar.deptoMap||{}).filter(([n])=>!/^\d+$/.test(n)&&!n.includes('|')&&n.toLowerCase().includes(searchDept.toLowerCase())).sort(([a],[b])=>a.localeCompare(b)).map(([name,info])=>{
                     const isChk=selectedDeptos.some(s=>s.name.toUpperCase()===name);
                     const disp=name.charAt(0)+name.slice(1).toLowerCase();
                     return (
@@ -609,14 +661,6 @@ export default function Home() {
             </div>
           ))}
 
-          {/* Amarillas toggle */}
-          <div style={{marginBottom:4,padding:'8px 10px',background:soloAmarillas?'#fef3c7':'#f8fafc',border:`1px solid ${soloAmarillas?'#fcd34d':'#e2e8f0'}`,borderRadius:7,transition:'all 0.3s'}}>
-            <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',margin:0}}>
-              <input type="checkbox" checked={soloAmarillas} onChange={e=>setSoloAmarillas(e.target.checked)} style={{accentColor:'#d97706',margin:0,width:14,height:14,flexShrink:0}}/>
-              <span style={{fontSize:11.5,color:'#92400e',fontWeight:600,lineHeight:'1.3'}}>⚡ Solo Candidatas "Amarillas"<br/><span style={{fontSize:10,fontWeight:400}}>(Inactivas {'>'}15M y sin AC)</span></span>
-            </label>
-          </div>
-
           {/* Buscador general texto */}
           <div style={{marginBottom:4}}>
             <input placeholder="🔍 Buscar: Sociedad, CUIT, Nombre..." value={filtroTextoGeneral} onChange={e=>setFiltroTextoGeneral(e.target.value)}
@@ -636,7 +680,7 @@ export default function Home() {
               >✕ Limpiar todo y Volver</button>
             )}
           </div>
-        </>)}
+        </>
       </div>
 
       {/* CONTENIDO PRINCIPAL */}
@@ -688,11 +732,7 @@ export default function Home() {
             </div>
             <div style={{display: 'flex', gap: '1rem', alignItems: 'center'}}>
                <button onClick={() => setShowGlosario(true)} style={{background: '#e2e8f0', color: '#1e293b', padding: '0.5rem 1rem', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px', transition: 'background 0.2s'}}>📖 Glosario</button>
-               {!isEmpty && (
-                   <div style={{background: '#f8fafc', padding: '0.5rem 1rem', borderRadius: '20px', border: '1px solid #e2e8f0', fontSize: '13px', fontWeight: 500}}>
-                      🔥 Extracción Limitless Activada
-                   </div>
-               )}
+
             </div>
           </div>
 
@@ -816,6 +856,16 @@ export default function Home() {
                     if (v <= 10000) return {background:'#eaaa20',color:'#000'};
                     return {background:'#000',color:'#f59e0b'};
                   };
+                  const hace15mSoc = new Date();
+                  hace15mSoc.setMonth(hace15mSoc.getMonth() - 15);
+                  const getEstado = (dc) => {
+                    const ultActDate = dc?.Ult_act ? new Date(dc.Ult_act) : null;
+                    const tieneActividad = ultActDate && ultActDate >= hace15mSoc;
+                    if (tieneActividad) return { color: '#ef4444', title: 'Cuenta Activa — actividad en los últimos 15 meses' };
+                    const tieneAsignado = !!(dc?.asociado_comercial || dc?.representante);
+                    if (tieneAsignado) return { color: '#f59e0b', title: 'Merma — sin actividad +15 meses, con AC / Representante asignado' };
+                    return { color: '#22c55e', title: 'Libre — sin AC ni actividad en los últimos 15 meses' };
+                  };
                   return (
                   <div className="card" style={{padding:0,overflow:'hidden'}}>
                     {/* Header + filtros */}
@@ -851,10 +901,20 @@ export default function Home() {
                         >{l}</button>
                         );
                       })}
-                      <span style={{marginLeft:'auto',fontSize:12,color:'#64748b'}}>{socFiltered.length} sociedades</span>
+                      <button
+                        onClick={() => { setFiltro500(p => !p); setVisibleCountSOC(30); }}
+                        title="Establecimientos de más de 500 cabezas"
+                        style={{padding:'4px 12px',borderRadius:99,border:`1.5px solid ${filtro500?'#d97706':'#e2e8f0'}`,background:filtro500?'#d97706':'#fff',color:filtro500?'#fff':'#d97706',fontWeight:700,fontSize:12,cursor:'pointer',transition:'all 0.15s',letterSpacing:'0.04em'}}
+                      >+500</button>
+                      <button
+                        onClick={() => { setPfMode(p => !p); setVisibleCountSOC(30); }}
+                        title="Potenciales Feedlots: alta cantidad de cabezas, baja proporción de vacas"
+                        style={{padding:'4px 12px',borderRadius:99,border:`1.5px solid ${pfMode?'#7c3aed':'#e2e8f0'}`,background:pfMode?'#7c3aed':'#fff',color:pfMode?'#fff':'#7c3aed',fontWeight:700,fontSize:12,cursor:'pointer',transition:'all 0.15s',letterSpacing:'0.04em'}}
+                      >PF</button>
+                      <span style={{marginLeft:'auto',fontSize:12,color:'#64748b'}}>{socDisplay.length} {pfMode ? '🐂 feedlots potenciales' : 'sociedades'}</span>
                       <button
                         onClick={handleExportSheets}
-                        disabled={exportando || socFiltered.length === 0}
+                        disabled={exportando || socDisplay.length === 0}
                         style={{
                           marginLeft:8, padding:'5px 16px', borderRadius:99,
                           border:'1.5px solid #16a34a',
@@ -895,10 +955,11 @@ export default function Home() {
                             <th>CCC</th>
                             <th>CI Fae</th>
                             <th>CI Inv</th>
+                            <th style={{textAlign:'center'}}>Estado</th>
                           </tr>
                         </thead>
                         <tbody style={{fontSize:'12.5px'}}>
-                          {socFiltered.slice(0, visibleCountSOC).map((row, i) => {
+                          {socDisplay.slice(0, visibleCountSOC).map((row, i) => {
                             const dc = row._dcRow;
                             const rawBov = Number(row.total_bovinos || 0);
                             const totalK = rawBov >= 1000 ? (rawBov/1000).toFixed(1)+'k' : rawBov;
@@ -912,7 +973,17 @@ export default function Home() {
                             const ccc = dc?.conc_gral ? (Number(dc.conc_gral)*100).toFixed(0)+'%' : '-';
                             const tieneDcac = row.existe_en_dcac === 'SI';
                             return (
-                              <tr key={i} style={tieneDcac ? {background:'#f0fdf4'} : {}}>
+                              <tr
+                                key={i}
+                                onClick={() => setSelectedSociedad(row)}
+                                style={{
+                                  ...(tieneDcac ? {background:'#f0fdf4'} : {}),
+                                  cursor: 'pointer',
+                                  transition: 'background 0.12s',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#e0f2fe'}
+                                onMouseLeave={e => e.currentTarget.style.background = tieneDcac ? '#f0fdf4' : ''}
+                              >
                                 <td>
                                   <div className="highlight" style={{fontWeight:600}}>{row.razon_social_senasa || row.razon_social}</div>
                                   {dc?.['st.razon_social'] && dc['st.razon_social'] !== (row.razon_social_senasa||row.razon_social) && (
@@ -938,6 +1009,25 @@ export default function Home() {
                                 <td style={{fontWeight:600,color:ccc!=='-'?'#6366f1':'#94a3b8'}}>{ccc}</td>
                                 <td style={{textAlign:'center'}}>{dc?.sugerido_ci_faena || <span style={{color:'#cbd5e1'}}>-</span>}</td>
                                 <td style={{textAlign:'center'}}>{dc?.sugerido_ci_invernada || <span style={{color:'#cbd5e1'}}>-</span>}</td>
+                                <td style={{textAlign:'center'}}>
+                                  {(() => {
+                                    const estado = getEstado(dc);
+                                    return (
+                                      <span
+                                        title={estado.title}
+                                        style={{
+                                          display: 'inline-block',
+                                          width: 12,
+                                          height: 12,
+                                          borderRadius: '50%',
+                                          background: estado.color,
+                                          boxShadow: `0 0 0 2px ${estado.color}33`,
+                                          cursor: 'help',
+                                        }}
+                                      />
+                                    );
+                                  })()}
+                                </td>
                               </tr>
                             );
                           })}
@@ -945,7 +1035,7 @@ export default function Home() {
                       </table>
                     </div>
 
-                    {socFiltered.length > visibleCountSOC && (
+                    {socDisplay.length > visibleCountSOC && (
                       <div style={{padding:'1rem',textAlign:'center',background:'#f8fafc',borderTop:'1px solid #e2e8f0'}}>
                         <button
                           onClick={() => setVisibleCountSOC(prev => prev + 25)}
@@ -985,28 +1075,60 @@ export default function Home() {
 
       {showGlosario && (
         <div style={{position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
-           <div style={{background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto'}}>
+           <div style={{background: '#fff', padding: '2rem', borderRadius: '12px', width: '90%', maxWidth: '640px', maxHeight: '90vh', overflowY: 'auto'}}>
               <h2 style={{fontSize: '1.5rem', marginBottom: '1rem', color: '#0f172a'}}>📖 Glosario & Criterios</h2>
-              
-              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem'}}>Funnel Sociedades (Q188)</h3>
+
+              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem'}}>Funnel de Sociedades (Q188)</h3>
               <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
-                <strong>Agrupación por Departamento:</strong> Las sociedades provenientes de la Base Clave de Senasa se agrupan en base a su establecimiento principal (el que más capacidad de cabezas reporta).
+                <strong>Agrupación por Departamento:</strong> Cada sociedad se asigna al departamento de su establecimiento principal (el que mayor cantidad de cabezas reporta). Esto define en qué celda geográfica se contabiliza.
               </p>
               <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
-                <strong>Sociedades dCaC:</strong> Se utiliza el número CUIT para intentar determinar cuántas de esas productoras Senasa están efectivamente registradas en dCaC, para calcular el grado de penetración de mercado de cada departamento geoespacial.
+                <strong>Sociedad Solo BC:</strong> Productora en la Base Clave SENASA sin cuenta en dCaC — universo de prospectos sin trabajar.
               </p>
               <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
-                <strong>Cabezas Operadas dCaC:</strong> Representa una sumatoria del total de cabezas operadas (Compras y Ventas de Inverna y Faena sumadas) para cada sociedad a lo largo de nuestro historial.
-              </p>
-              
-              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem'}}>Sociedades en dCaC (Q189)</h3>
-              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
-                <strong>CCC (Concreción General):</strong> Porcentaje que mide el nivel de concreción: % de operaciones formalmente liquidadas ó concretadas por sobre las operaciones ingresadas como "No concretadas/Caídas". No incluye operaciones latentes.
+                <strong>Sociedad en dCaC:</strong> Productora que ya tiene cuenta activa en deCampoaCampo. Se verifica cruzando el CUIT con Q189.
               </p>
               <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
-                <strong>Candidatas "Amarillas":</strong> Son sociedades de dCaC inactvas y posiblemente abandonadas. Se etiquetan según dos criterios: que no hayan tenido actividad en el portal web (ni logins, ni posteos, ni miradas de negocio) por más de 15 meses; y que además NO tengan ni A.C mapeado ni Representante comercial interno.
+                <strong>Cabezas Operadas dCaC:</strong> Suma total de cabezas bovinas operadas (Compras + Ventas de Inverna y Faena) a lo largo de todo el historial en dCaC.
               </p>
-              
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
+                <strong>Cuentas Libres:</strong> Sociedades en dCaC sin AC ni Representante asignado, y con última actividad u operación hace más de 15 meses. Son prioridad de reasignación.
+              </p>
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
+                <strong>Mermas:</strong> Sociedades en dCaC que SÍ tienen AC o Representante pero cuya última actividad u operación supera los 15 meses.
+              </p>
+
+              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem'}}>Sociedades en dCaC (Q189)</h3>
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
+                <strong>CCC (Concreción General):</strong> Porcentaje que mide el nivel de concreción de una cuenta: operaciones formalmente liquidadas o concretadas sobre el total de operaciones ingresadas (excluye latentes y caídas sin resolución).
+              </p>
+              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem'}}>Semáforo de Estado (columna ESTADO)</h3>
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.4rem'}}>
+                Aplica solo a sociedades que ya están en dCaC. Indica su estado comercial actual:
+              </p>
+              <div style={{display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '0.75rem', paddingLeft: '0.5rem'}}>
+                <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                  <span style={{width: 12, height: 12, borderRadius: '50%', background: '#22c55e', display: 'inline-block', flexShrink: 0}}/>
+                  <span style={{fontSize: '13px', color: '#475569'}}><strong>Verde — Libre:</strong> Sin AC ni Representante asignado y sin actividad en los últimos 15 meses. Candidata a ser asignada a un comercial.</span>
+                </div>
+                <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                  <span style={{width: 12, height: 12, borderRadius: '50%', background: '#f59e0b', display: 'inline-block', flexShrink: 0}}/>
+                  <span style={{fontSize: '13px', color: '#475569'}}><strong>Amarillo — Merma:</strong> Tiene AC o Representante asignado pero sin actividad u operación en los últimos 15 meses.</span>
+                </div>
+                <div style={{display: 'flex', alignItems: 'center', gap: 10}}>
+                  <span style={{width: 12, height: 12, borderRadius: '50%', background: '#ef4444', display: 'inline-block', flexShrink: 0}}/>
+                  <span style={{fontSize: '13px', color: '#475569'}}><strong>Rojo — Activa:</strong> Con actividad u operación registrada en los últimos 15 meses. Cuenta gestionada actualmente.</span>
+                </div>
+              </div>
+
+              <h3 style={{fontSize: '1.1rem', color: '#1e293b', marginTop: '1.5rem', marginBottom: '0.5rem', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.4rem'}}>Filtros Geográficos (deCampoaCampo Panel)</h3>
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
+                <strong>Provincia / Zona / Departamento:</strong> Permiten acotar la vista a una región específica del país. La selección se refleja simultáneamente en el mapa y en las tablas de Funnel y Sociedades Detalle.
+              </p>
+              <p style={{fontSize: '13px', color: '#475569', marginBottom: '0.5rem'}}>
+                <strong>Zona Comercial:</strong> Agrupación interna de departamentos según la estructura de zonas del equipo comercial deCampoaCampo. Cada zona tiene un responsable asignado.
+              </p>
+
               <button 
                 onClick={() => setShowGlosario(false)} 
                 style={{width: '100%', marginTop: '2rem', padding: '0.8rem', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer', transition: 'background 0.2s', fontSize: '14px'}}>
@@ -1017,7 +1139,7 @@ export default function Home() {
       )}
 
       {drilldownDep && (() => {
-        const depRows = tables.dt188.filter(r => (String(r.partido_establecimiento_senasa || 'S/D')).toUpperCase() === drilldownDep);
+        const depRows = (tables.dt_sociedades || []).filter(r => (String(r.partido_establecimiento_senasa || 'S/D')).toUpperCase() === drilldownDep);
         
         return (
           <div style={{position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.5)', zIndex: 9999, display: 'flex', justifyContent: 'center', alignItems: 'center'}}>
@@ -1097,6 +1219,13 @@ export default function Home() {
         );
       })()}
 
+      {/* Modal Crear Lead desde Sociedad */}
+      {selectedSociedad && (
+        <SociedadLeadModal
+          sociedad={selectedSociedad}
+          onClose={() => setSelectedSociedad(null)}
+        />
+      )}
     </div>
   );
 }
